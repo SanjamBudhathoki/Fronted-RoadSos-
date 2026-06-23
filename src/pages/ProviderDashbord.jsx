@@ -8,7 +8,6 @@ import { MapPin, Navigation } from 'lucide-react';
 import socket from '../services/socket';
 import { calculateDistance } from '../services/distanceCalculator';
 
-
 const severityColors = {
   LOW: 'bg-green-100 text-green-700',
   MEDIUM: 'bg-yellow-100 text-yellow-700',
@@ -17,128 +16,96 @@ const severityColors = {
 };
 
 const ProviderDashboard = () => {
-
   const [nearbySos, setNearbySos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [availability, setAvailability] = useState(true);
   const [activeMission, setActiveMission] = useState(null);
-const [currentLocation, setCurrentLocation] = useState(null);
-const [filter, setFilter] = useState('ALL');
-const [missionStartTime, setMissionStartTime] = useState(null);
-const [missionElapsed, setMissionElapsed] = useState(0);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [filter, setFilter] = useState('ALL');
+  const [missionStartTime, setMissionStartTime] = useState(null);
+  const [missionElapsed, setMissionElapsed] = useState(0);
+  const [journeyStartedAt, setJourneyStartedAt] = useState(null);
 
-console.log("Mission Status:", activeMission?.status);
+  console.log("Mission Status:", activeMission?.status);
 
-const fetchNearbySos = useCallback(async () => {
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      try {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
+  const fetchNearbySos = useCallback(async () => {
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const latitude = position.coords.latitude;
+          const longitude = position.coords.longitude;
 
-        setCurrentLocation({
-          latitude,
-          longitude,
-        });
+          setCurrentLocation({ latitude, longitude });
 
-        const response =
-          await sosService.getNearbySos({
-            latitude,
-            longitude,
-          });
-
-        const sosList =
-          response?.data?.data || [];
-
-        setNearbySos(sosList);
-      } catch (err) {
-        console.error(err);
-        setError(
-          'Failed to fetch nearby emergencies.'
-        );
-      } finally {
+          const response = await sosService.getNearbySos({ latitude, longitude });
+          const sosList = response?.data?.data || [];
+          setNearbySos(sosList);
+        } catch (err) {
+          console.error(err);
+          setError('Failed to fetch nearby emergencies.');
+        } finally {
+          setLoading(false);
+        }
+      },
+      () => {
+        setError('Location permission denied.');
         setLoading(false);
-      }
-    },
-    () => {
-      setError('Location permission denied.');
-      setLoading(false);
-    },
-    {
-      enableHighAccuracy: true,
-    }
-  );
-}, []);
+      },
+      { enableHighAccuracy: true }
+    );
+  }, []);
 
   const handleNewSOS = useCallback((newSos) => {
     setNearbySos((prev) => {
-      const exists = prev.some(
-        (item) => item._id === newSos._id
-      );
-
+      const exists = prev.some((item) => item._id === newSos._id);
       return exists ? prev : [newSos, ...prev];
     });
   }, []);
 
-useEffect(() => {
-  fetchNearbySos();
-
-  const onAccepted = ({ sosId }) => {
-    setNearbySos((prev) =>
-      prev.filter((item) => item._id !== sosId)
-    );
-  };
-
-  const onCompleted = ({ sosId }) => {
-    setActiveMission((current) =>
-      current?._id === sosId
-        ? null
-        : current
-    );
-  };
-
-  socket.on('sos:new', handleNewSOS);
-  socket.on('sos:accepted', onAccepted);
-  socket.on('sos:completed', onCompleted);
-
-  return () => {
-    socket.off('sos:new', handleNewSOS);
-    socket.off('sos:accepted', onAccepted);
-    socket.off('sos:completed', onCompleted);
-  };
-}, [fetchNearbySos, handleNewSOS]);
-
-useEffect(() => {
-  const loadProviderStatus = async () => {
-    try {
-      const response = await authService.getProfile();
-
-      const profile =
-        response?.data?.data ||
-        response?.data ||
-        response;
-
-      if (
-        typeof profile?.isAvailable ===
-        'boolean'
-      ) {
-        setAvailability(
-          profile.isAvailable
-        );
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  loadProviderStatus();
-}, []);
-
+  // Initial setup
   useEffect(() => {
-    if(!navigator.geolocation) return;
-  const watchId =
-    navigator.geolocation.watchPosition(
+    fetchNearbySos();
+
+    const onAccepted = ({ sosId }) => {
+      setNearbySos((prev) => prev.filter((item) => item._id !== sosId));
+    };
+
+    const onCompleted = ({ sosId }) => {
+      setActiveMission((current) => (current?._id === sosId ? null : current));
+    };
+
+    socket.on('sos:new', handleNewSOS);
+    socket.on('sos:accepted', onAccepted);
+    socket.on('sos:completed', onCompleted);
+
+    return () => {
+      socket.off('sos:new', handleNewSOS);
+      socket.off('sos:accepted', onAccepted);
+      socket.off('sos:completed', onCompleted);
+    };
+  }, [fetchNearbySos, handleNewSOS]);
+
+  // Load provider profile
+  useEffect(() => {
+    const loadProviderStatus = async () => {
+      try {
+        const response = await authService.getProfile();
+        const profile = response?.data?.data || response?.data || response;
+        if (typeof profile?.isAvailable === 'boolean') {
+          setAvailability(profile.isAvailable);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    loadProviderStatus();
+  }, []);
+
+  // GPS watch
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    const watchId = navigator.geolocation.watchPosition(
       (position) => {
         setCurrentLocation({
           latitude: position.coords.latitude,
@@ -146,279 +113,237 @@ useEffect(() => {
         });
       },
       console.error,
-      {
-        enableHighAccuracy: true,
-      }
+      { enableHighAccuracy: true }
     );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
 
-  return () =>
-    navigator.geolocation.clearWatch(
-      watchId
-    );
-}, []);
-
-useEffect(() => {
-  const interval = setInterval(() => {
-    fetchNearbySos();
-  }, 15000);
-
-  return () => clearInterval(interval);
-}, [fetchNearbySos]);
-
+  // Auto-refresh nearby SOS
   useEffect(() => {
-  const loadActiveMission = async () => {
-    try {
-      const response =
-        await sosService.getActiveMission();
+    const interval = setInterval(() => {
+      fetchNearbySos();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [fetchNearbySos]);
 
-      if (response?.data) {
-        setActiveMission(
-          response.data
-        );
+  // Load active mission on mount
+  useEffect(() => {
+    const loadActiveMission = async () => {
+      try {
+        const response = await sosService.getActiveMission();
+        if (response?.data) {
+          setActiveMission(response.data);
+          if (response.data.acceptedAt) {
+            setMissionStartTime(new Date(response.data.acceptedAt).getTime());
+          }
+        }
+      } catch (err) {
+        console.log(err);
       }
-    } catch (err) {
-      console.log(err);
+    };
+    loadActiveMission();
+  }, []);
+
+  // Mission timer
+  useEffect(() => {
+    if (!missionStartTime) return;
+    const timer = setInterval(() => {
+      setMissionElapsed(Math.floor((Date.now() - missionStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [missionStartTime]);
+
+  // ==========================================
+  // 🔧 FIXED: Send location immediately when mission is active
+  // ==========================================
+  useEffect(() => {
+    if (!activeMission || !currentLocation) {
+      console.log("⏸️ Not sending location - missing:", {
+        hasMission: !!activeMission,
+        hasLocation: !!currentLocation,
+        missionStatus: activeMission?.status
+      });
+      return;
     }
-  };
 
-  loadActiveMission();
-}, []);
+    // Send location for ANY active status (ACCEPTED, ON_THE_WAY, ARRIVED)
+    const shouldSendLocation = ["ACCEPTED", "ON_THE_WAY", "ARRIVED"].includes(activeMission.status);
 
+    if (!shouldSendLocation) {
+      console.log("⏸️ Mission not in active status:", activeMission.status);
+      return;
+    }
+
+    const payload = {
+      sosId: activeMission._id,
+      latitude: currentLocation.latitude,
+      longitude: currentLocation.longitude,
+    };
+
+    console.log("📍 Sending Provider Location:", payload);
+    socket.emit("provider:location-update", payload);
+
+  }, [currentLocation, activeMission]);
+
+  // 🔧 FIXED: Continuous location updates every 5 seconds when ON_THE_WAY
   useEffect(() => {
-  if (!missionStartTime) return;
+    if (!activeMission || !currentLocation) return;
+    if (activeMission.status !== "ON_THE_WAY") return;
 
-  const timer = setInterval(() => {
-    setMissionElapsed(
-      Math.floor(
-        (Date.now() -
-          missionStartTime) /
-          1000
-      )
-    );
-  }, 1000);
+    console.log("🔄 Starting continuous location updates");
+    
+    const interval = setInterval(() => {
+      const payload = {
+        sosId: activeMission._id,
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+      };
+      console.log("📍 Continuous update:", payload);
+      socket.emit("provider:location-update", payload);
+    }, 5000);
 
-  return () => clearInterval(timer);
-}, [missionStartTime]);
+    return () => {
+      console.log("🛑 Stopping continuous location updates");
+      clearInterval(interval);
+    };
+  }, [activeMission?.status, currentLocation, activeMission?._id]);
 
-useEffect(() => {
-  if (
-    !activeMission ||
-    !currentLocation
-  ) return;
-
-  const payload = {
-    sosId: activeMission._id,
-    latitude: currentLocation.latitude,
-    longitude: currentLocation.longitude,
-  };
-
-  console.log(
-    "📍 Sending Provider Location",
-    payload
-  );
-
-  socket.emit(
-    "provider:location-update",
-    payload
-  );
-
-}, [
-  currentLocation,
-  activeMission
-]);
-
-useEffect(() => {
-  const onStatusUpdated =
-    ({ sosId, status }) => {
-      if (
-        activeMission?._id === sosId
-      ) {
-        setActiveMission(
-          (prev) => ({
-            ...prev,
-            status,
-          })
-        );
+  // Listen for status updates
+  useEffect(() => {
+    const onStatusUpdated = ({ sosId, status }) => {
+      if (activeMission?._id === sosId) {
+        setActiveMission((prev) => ({ ...prev, status }));
       }
     };
 
-  socket.on(
-    "sos:statusUpdated",
-    onStatusUpdated
-  );
+    socket.on("sos:statusUpdated", onStatusUpdated);
+    return () => { socket.off("sos:statusUpdated", onStatusUpdated); };
+  }, [activeMission]);
 
-  return () => {
-    socket.off(
-      "sos:statusUpdated",
-      onStatusUpdated
-    );
-  };
-}, [activeMission]);
-
-const handleToggleAvailability = async () => {
-    try {
-      const newStatus = !availability;
-
-      await authService.updateProviderAvailability({
-        isAvailable: newStatus,
-      });
-
-      setAvailability(newStatus);
-    } catch (err) {
-      setError('Failed to update availability.');
+  // Auto-arrival detection
+  useEffect(() => {
+    if (!activeMission || !currentLocation || activeMission.status !== "ON_THE_WAY" || !journeyStartedAt) {
+      return;
     }
-  };
 
-const handleAcceptSos = async (id) => {
-  try {
-    const response =await sosService.acceptSos(id);
+    const elapsed = (Date.now() - journeyStartedAt) / 1000;
+    if (elapsed < 10) return;
 
-   const mission = response?.data;
-setActiveMission(mission);
-
-    setMissionStartTime(
-  mission.acceptedAt
-    ? new Date(
-        mission.acceptedAt
-      ).getTime()
-    : Date.now()
-);
-    setNearbySos((prev) =>
-      prev.filter(
-        (item) => item._id !== id
-      )
-    );
-  } catch (err) {
-    console.error(err);
-    setError('Failed to accept SOS.');
-  }
-};
-
-
-const formatDuration = (seconds) => {
-  const mins = Math.floor(
-    seconds / 60
-  );
-
-  const secs = seconds % 60;
-
-  return `${mins}m ${secs}s`;
-};
-
-const handleNavigate = () => {
-  if (!activeMission?.location?.coordinates) {
-    setError("Location not available.");
-    return;
-  }
-
-  const [lng, lat] =
-    activeMission.location.coordinates;
-
-  const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-
-  window.open(url, "_blank", "noopener,noreferrer");
-};
-
-const handleCompleteMission =  async () => {
-    if (!activeMission) return;
-
-    try {
-      await sosService.updateSosStatus(
-        activeMission._id,
-        "RESOLVED"
-      );
-
-      setActiveMission(null);
-      setMissionStartTime(null);
-      setMissionElapsed(0);
-
-      fetchNearbySos();
-    } catch (err) {
-      console.error(err);
-      setError(
-        "Failed to resolve mission."
-      );
-    }
-  };
-
-const updateMissionStatus = async (status) => {
-  if (!activeMission?._id) return;
-
-  try {
-    await sosService.updateSosStatus(
-      activeMission._id,
-      status
-    );
-
-    setActiveMission((prev) => ({
-      ...prev,
-      status,
-    }));
-
-    socket.emit("sos:statusUpdated", {
-      sosId: activeMission._id,
-      status,
-    });
-  } catch (error) {
-    console.error("Status update failed:", error);
-    setError("Failed to update mission status.");
-  }
-};
-
-
-
-  const filteredSos =
-  filter === 'ALL'
-    ? nearbySos
-    : nearbySos.filter(
-        (sos) =>
-          sos.emergencyType === filter
-      );
-
-      // Map
-    useEffect(() => {
-
-  if (
-    !activeMission ||
-    !currentLocation ||
-    activeMission.status !==
-      "ON_THE_WAY"
-  ) {
-    return;
-  }
-
-  const distance =
-    calculateDistance(
+    const distance = calculateDistance(
       currentLocation.latitude,
       currentLocation.longitude,
       activeMission.location.coordinates[1],
       activeMission.location.coordinates[0]
     );
 
-  if (distance < 0.05) {
+    console.log("📏 Distance to user:", distance.toFixed(3), "km");
 
-    updateMissionStatus(
-      "ARRIVED"
-    );
+    if (distance <= 0.05) {
+      updateMissionStatus("ARRIVED");
+      socket.emit("provider-arrived", { sosId: activeMission._id });
+    }
+  }, [currentLocation, activeMission, journeyStartedAt]);
 
-    socket.emit(
-      "provider-arrived",
-      {
-        sosId:
-          activeMission._id
+  // Handlers
+  const handleToggleAvailability = async () => {
+    try {
+      const newStatus = !availability;
+      await authService.updateProviderAvailability({ isAvailable: newStatus });
+      setAvailability(newStatus);
+    } catch (err) {
+      setError('Failed to update availability.');
+    }
+  };
+
+  const handleAcceptSos = async (id) => {
+    try {
+      const response = await sosService.acceptSos(id);
+      const mission = response?.data;
+      setActiveMission(mission);
+      setMissionStartTime(mission.acceptedAt ? new Date(mission.acceptedAt).getTime() : Date.now());
+      setNearbySos((prev) => prev.filter((item) => item._id !== id));
+      
+      // 🔧 Immediately send location after accepting
+      if (currentLocation) {
+        socket.emit("provider:location-update", {
+          sosId: mission._id,
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+        });
       }
-    );
-  }
+    } catch (err) {
+      console.error(err);
+      setError('Failed to accept SOS.');
+    }
+  };
 
-}, [
-  currentLocation,
-  activeMission
-]);
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
 
-const distance =
-  activeMission &&
-  currentLocation &&
-  activeMission.location?.coordinates
+  const handleNavigate = () => {
+    if (!activeMission?.location?.coordinates) {
+      setError("Location not available.");
+      return;
+    }
+    const [lng, lat] = activeMission.location.coordinates;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleCompleteMission = async () => {
+    if (!activeMission) return;
+    try {
+      await sosService.updateSosStatus(activeMission._id, "RESOLVED");
+      setActiveMission(null);
+      setMissionStartTime(null);
+      setMissionElapsed(0);
+      setJourneyStartedAt(null);
+      fetchNearbySos();
+    } catch (err) {
+      console.error(err);
+      setError("Failed to resolve mission.");
+    }
+  };
+
+  const updateMissionStatus = async (status) => {
+    if (!activeMission?._id) return;
+    try {
+      await sosService.updateSosStatus(activeMission._id, status);
+      
+      setActiveMission((prev) => ({ ...prev, status }));
+
+      // Track when journey started
+      if (status === "ON_THE_WAY") {
+        setJourneyStartedAt(Date.now());
+      }
+
+      socket.emit("sos:statusUpdated", {
+        sosId: activeMission._id,
+        status,
+      });
+
+      // 🔧 Send location immediately on status change
+      if (currentLocation && ["ON_THE_WAY", "ARRIVED"].includes(status)) {
+        socket.emit("provider:location-update", {
+          sosId: activeMission._id,
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+        });
+      }
+    } catch (error) {
+      console.error("Status update failed:", error);
+      setError("Failed to update mission status.");
+    }
+  };
+
+  const filteredSos = filter === 'ALL'
+    ? nearbySos
+    : nearbySos.filter((sos) => sos.emergencyType === filter);
+
+  const distance = activeMission && currentLocation && activeMission.location?.coordinates
     ? calculateDistance(
         currentLocation.latitude,
         currentLocation.longitude,
@@ -433,124 +358,89 @@ const distance =
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">
-          Provider Dashboard
-        </h1>
-
+        <h1 className="text-3xl font-bold text-gray-900">Provider Dashboard</h1>
         <Button
-          variant={
-            availability ? 'outline' : 'secondary'
-          }
+          variant={availability ? 'outline' : 'secondary'}
           onClick={handleToggleAvailability}
         >
-          {availability
-            ? 'Available'
-            : 'Unavailable'}
+          {availability ? '🟢 Available' : '🔴 Unavailable'}
         </Button>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="mb-6 p-3 rounded-lg bg-red-50 text-red-600 text-sm">
-          {error}
+        <div className="mb-6 p-3 rounded-lg bg-red-50 text-red-600 text-sm">{error}</div>
+      )}
+
+      {/* Debug Info - Remove after testing */}
+      {activeMission && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
+          <p><strong>Debug:</strong></p>
+          <p>Mission ID: {activeMission._id}</p>
+          <p>Status: {activeMission.status}</p>
+          <p>Location: {currentLocation ? `${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}` : '❌'}</p>
+          <p>Socket: {socket.connected ? '✅ Connected' : '❌ Disconnected'}</p>
         </div>
       )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <Card>
-          <h4 className="text-sm text-gray-500">
-            Nearby SOS
-          </h4>
-          <p className="text-2xl font-bold">
-            {nearbySos.length}
-          </p>
+          <h4 className="text-sm text-gray-500">Nearby SOS</h4>
+          <p className="text-2xl font-bold">{nearbySos.length}</p>
         </Card>
-
         <Card>
-          <h4 className="text-sm text-gray-500">
-            Status
-          </h4>
-          <p className="text-2xl font-bold">
-            {availability
-              ? 'Available'
-              : 'Unavailable'}
-          </p>
+          <h4 className="text-sm text-gray-500">Status</h4>
+          <p className="text-2xl font-bold">{availability ? 'Available' : 'Unavailable'}</p>
         </Card>
-
         <Card>
-        
-        <div className="flex items-center gap-2 mb-4">
-  <Navigation className="h-5 w-5 text-blue-600" />
-  <h3 className="font-bold text-lg">
-    Active Mission
-  </h3>
-        </div>
-
+          <div className="flex items-center gap-2 mb-4">
+            <Navigation className="h-5 w-5 text-blue-600" />
+            <h3 className="font-bold text-lg">Active Mission</h3>
+          </div>
         </Card>
-        
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* SOS List */}
         <div className="lg:col-span-2">
-          <h2 className="text-xl font-bold mb-4">
-            Nearby Emergencies
-          </h2>
-                <div className="mb-4">
-  <select
-    value={filter}
-    onChange={(e) =>
-      setFilter(e.target.value)
-    }
-    className="border rounded-lg px-3 py-2"
-  >
-    <option value="ALL">
-      All Emergencies
-    </option>
-  <option value="MEDICAL">Medical</option>
-<option value="POLICE">Police</option>
-<option value="TOWING">Towing</option>
-<option value="GENERAL">General</option>
-  </select>
-</div>
+          <h2 className="text-xl font-bold mb-4">Nearby Emergencies</h2>
+          <div className="mb-4">
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="border rounded-lg px-3 py-2"
+            >
+              <option value="ALL">All Emergencies</option>
+              <option value="MEDICAL">Medical</option>
+              <option value="POLICE">Police</option>
+              <option value="TOWING">Towing</option>
+              <option value="GENERAL">General</option>
+            </select>
+          </div>
+          
           {filteredSos.length === 0 ? (
             <Card>
-              <p className="text-center text-gray-500 py-8">
-                No nearby emergencies at the moment.
-              </p>
+              <p className="text-center text-gray-500 py-8">No nearby emergencies at the moment.</p>
             </Card>
           ) : (
             <div className="space-y-4">
               {filteredSos.map((sos) => (
-                <Card
-                  key={sos._id}
-                  className="border-l-4 border-red-500"
-                >
+                <Card key={sos._id} className="border-l-4 border-red-500">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-bold text-lg">
-                        {sos.emergencyType}
-                      </h3>
-
+                      <h3 className="font-bold text-lg">{sos.emergencyType}</h3>
                       <p className="flex items-center gap-1 text-sm text-gray-500 mt-1">
                         <MapPin className="h-4 w-4" />
                         {sos.location?.coordinates
- ? `${sos.location.coordinates[1]}, ${sos.location.coordinates[0]}`
- : "Unknown Location"}
+                          ? `${sos.location.coordinates[1]}, ${sos.location.coordinates[0]}`
+                          : "Unknown Location"}
                       </p>
-
                       {sos.distance && (
-                        <p className="text-sm text-blue-600 mt-2">
-                          {sos.distance.toFixed(1)} km
-                          away
-                        </p>
+                        <p className="text-sm text-blue-600 mt-2">{sos.distance.toFixed(1)} km away</p>
                       )}
-
                       <p className="text-xs text-gray-400 mt-2">
-                        Reported by:{' '}
-                        {sos.driverId?.phone ||
-                          'Unknown'}
+                        Reported by: {sos.driverId?.phone || 'Unknown'}
                       </p>
                     </div>
 
@@ -558,48 +448,19 @@ const distance =
                       <span className="block px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">
                         {sos.status}
                       </span>
-
-                      <span
-                        className={`block px-3 py-1 rounded-full text-xs ${
-                          severityColors[
-                            sos.severity
-                          ] ||
-                          'bg-gray-100 text-gray-700'
-                        }`}
-                      >
+                      <span className={`block px-3 py-1 rounded-full text-xs ${
+                        severityColors[sos.severity] || 'bg-gray-100 text-gray-700'
+                      }`}>
                         {sos.severity}
                       </span>
-
-                       <span
-                        className={`block px-3 py-1 rounded-full text-xs ${
-                          severityColors[
-                            sos.severity
-                          ] ||
-                          'bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        <p className="text-sm font-medium text-red-600">
- Priority:
- {sos.priorityScore}
-</p>
-                      </span>
-                      
-
+                      {sos.priorityScore && (
+                        <p className="text-sm font-medium text-red-600">Priority: {sos.priorityScore}</p>
+                      )}
                       {sos.status?.toUpperCase() === 'PENDING' && (
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            handleAcceptSos(
-                              sos._id
-                            )
-                          }
-                        >
+                        <Button size="sm" onClick={() => handleAcceptSos(sos._id)}>
                           Accept Request
                         </Button>
-
-                        
                       )}
-
                     </div>
                   </div>
                 </Card>
@@ -613,192 +474,92 @@ const distance =
           <Card className="sticky top-24 bg-blue-50 border-blue-100">
             <div className="flex items-center gap-3 mb-4">
               <Navigation className="h-5 w-5 text-blue-600" />
-              <h3 className="font-bold text-lg">
-                Active Mission
-              </h3>
-            {activeMission && (
-  <div className="bg-white rounded-lg p-3 ms-104 mt-2">
-    <p className="text-xs text-gray-500">
-      Mission Duration
-    </p>
-
-    <p className="font-bold text-lg">
-      {formatDuration(
-        missionElapsed
-      )}
-    </p>
-  </div>
-)}
-
+              <h3 className="font-bold text-lg">Active Mission</h3>
+              {activeMission && (
+                <div className="bg-white rounded-lg p-3 ml-auto">
+                  <p className="text-xs text-gray-500">Mission Duration</p>
+                  <p className="font-bold text-lg">{formatDuration(missionElapsed)}</p>
+                </div>
+              )}
             </div>
 
-            {activeMission?.aiAnalysis
-  ?.recommendation_service && (
-  <Card>
-    <h4 className="font-semibold mb-2">
-      AI Recommendation
-    </h4>
-
-    <p className="text-sm text-gray-700">
-      {
-        activeMission?.aiAnalysis
-          ?.recommendation_service
-      }
-    </p>
-  </Card>
-)}
-
-
+            {activeMission?.aiAnalysis?.recommendation_service && (
+              <Card>
+                <h4 className="font-semibold mb-2">AI Recommendation</h4>
+                <p className="text-sm text-gray-700">{activeMission.aiAnalysis.recommendation_service}</p>
+              </Card>
+            )}
 
             {activeMission ? (
               <div className="space-y-5">
-                <div >
-                  <h4 className="font-semibold mb-1">
-                    {
-                      activeMission.emergencyType
-                    }
-                  </h4>
-
+                <div>
+                  <h4 className="font-semibold mb-1">{activeMission.emergencyType}</h4>
                   <p className="text-sm text-gray-600">
-                    {
-                      activeMission.location?.coordinates
-  ? `${activeMission.location.coordinates[1]},
-    ${activeMission.location.coordinates[0]}`
-  : "Unknown Location"
-                    }
+                    {activeMission.location?.coordinates
+                      ? `${activeMission.location.coordinates[1]}, ${activeMission.location.coordinates[0]}`
+                      : "Unknown Location"}
                   </p>
-
                   <p className="text-sm text-gray-600 mb-0.5">
-                    Contact:{' '}
-                    {
-                      activeMission.driverId
-                        ?.phone
-                    }
+                    Contact: {activeMission.driverId?.phone}
                   </p>
                 </div>
 
-{distance !== null && (
-  <div className="grid grid-cols-2 gap-3 mt-3">
+                {distance !== null && (
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                      <p className="text-xs text-gray-500 font-semibold">Distance</p>
+                      <p className="text-2xl font-bold text-green-600">{distance.toFixed(2)}</p>
+                      <p className="text-xs text-gray-500 font-semibold">KM Away</p>
+                    </div>
+                    <div className="bg-emerald-100 border border-blue-200 rounded-xl p-4">
+                      <p className="text-xs text-gray-500 font-bold">ETA</p>
+                      <p className="text-2xl font-bold text-blue-600">{Math.ceil(distance / 0.6)}</p>
+                      <p className="text-xs text-black font-semibold">Minutes</p>
+                    </div>
+                  </div>
+                )}
 
-    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-      <p className="text-xs text-gray-500 font-semibold">
-        Distance
-      </p>
+                <div className="space-y-3">
+                  <Button className="w-full" onClick={handleNavigate}>
+                    🗺️ Navigate
+                  </Button>
 
-      <p className="text-2xl font-bold text-green-600">
-        {distance.toFixed(2)}
-      </p>
+                  {activeMission?.status === "ACCEPTED" && (
+                    <Button className="w-full" onClick={() => updateMissionStatus("ON_THE_WAY")}>
+                      🚗 Start Journey
+                    </Button>
+                  )}
 
-      <p className="text-xs text-gray-500 font-semibold ">
-        KM Away
-      </p>
-    </div>
+                  {activeMission?.status === "ON_THE_WAY" && (
+                    <Button className="w-full" onClick={() => updateMissionStatus("ARRIVED")}>
+                      📍 Mark as Arrived
+                    </Button>
+                  )}
 
-    <div className="bg-emerald-100 border border-blue-200 rounded-xl p-4">
-      <p className="text-xs text-gray-500 font-bold">
-        ETA
-      </p>
+                  {activeMission?.status === "ARRIVED" && (
+                    <Button variant="primary" className="w-full" onClick={handleCompleteMission}>
+                      ✅ Mission Completed
+                    </Button>
+                  )}
 
-      <p className="text-2xl font-bold text-blue-600">
-        {Math.ceil(distance / 0.6)}
-      </p>
-
-      <p className="text-xs text-black font-semibold">
-        Minutes
-      </p>
-    </div>
-
-  </div>
-)}
-
-    <div className="space-y-3">
-      {/* Navigate */}
-<Button
- className='w-full'
-  onClick={() => {
-
-    const lat =
-      activeMission.location
-        .coordinates[1];
-
-    const lng =
-      activeMission.location
-        .coordinates[0];
-
-    window.open(
-      `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
-      "_blank"
-    );
-  }}
->
-  Navigate
-</Button>
-
-  {/* Start Journey */}
-  {activeMission?.status === "ACCEPTED" && (
-    
-    <Button
-      className="w-full"
-      onClick={() => updateMissionStatus("ON_THE_WAY")}
-    >
-      Start Journey
-    </Button>
-  )}
-
-  {/* Arrived */}
-  {activeMission?.status === "ON_THE_WAY" && (
-    <Button
-      className="w-full"
-      onClick={() => updateMissionStatus("ARRIVED")}
-    >
-      Arrived
-    </Button>
-  )}
-
-  {/* Resolve Mission */}
-  {activeMission?.status === "ARRIVED" && (
-    <Button
-      variant="primary"
-      className="w-full"
-      onClick={handleCompleteMission}
-    >
-      Mission Completed
-    </Button>
-  )}
-
-  {/* Status Badge */}
-    <div className="space-y-2">
-
-  {[
-    "ACCEPTED",
-    "ON_THE_WAY",
-    "ARRIVED",
-    "COMPLETED"
-  ].map(step => (
-
-    <div
-      key={step}
-      className={`p-2 rounded-lg ${
-        activeMission.status === step
-          ? "bg-green-500 text-white"
-          : "bg-gray-100"
-      }`}
-    >
-      {step}
-    </div>
-
-  ))}
-   
-    </div>
-
-</div>
-
-
+                  <div className="space-y-2">
+                    {["ACCEPTED", "ON_THE_WAY", "ARRIVED", "COMPLETED"].map(step => (
+                      <div
+                        key={step}
+                        className={`p-2 rounded-lg ${
+                          activeMission.status === step
+                            ? "bg-green-500 text-white"
+                            : "bg-gray-100"
+                        }`}
+                      >
+                        {step}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : (
-              <p className="text-gray-500">
-                No active mission.
-              </p>
+              <p className="text-gray-500">No active mission.</p>
             )}
           </Card>
         </div>
@@ -808,5 +569,3 @@ const distance =
 };
 
 export default ProviderDashboard;
-
-
