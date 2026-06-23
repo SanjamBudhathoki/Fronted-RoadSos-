@@ -1,9 +1,17 @@
 import { $port } from "./axios";
+import { saveOfflineSOS } from "./offlineSOS";
 
 export const sosService = {
   createSos: async (data) => {
-    const response = await $port.post('/sos/create', data);
+    try {
+     const response =  await $port.post('/sos/create', data);
     return response.data;
+    } catch (error) {
+      saveOfflineSOS({
+        ...data,
+        createdAt:Date.now()
+      })
+    } 
   },
   getMySos: async () => {
     const response = await $port.get('/sos/my');

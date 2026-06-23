@@ -8,6 +8,7 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 import MainLayout from "./layout/MainLayout.jsx";
 import mainRoutes from "./routes/main.routes.jsx";
 import { NotificationProvider } from "./context/NotificationContext.jsx";
+import { syncOfflineSOS } from "./services/offlineSOS.js";
 
 const router = createBrowserRouter([
   {

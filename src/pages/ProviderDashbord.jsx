@@ -6,6 +6,7 @@ import { sosService } from '../services/sosService';
 import { authService } from '../services/authService';
 import { MapPin, Navigation } from 'lucide-react';
 import socket from '../services/socket';
+import { calculateDistance } from '../services/distanceCalculator';
 
 
 const severityColors = {
@@ -203,22 +204,27 @@ useEffect(() => {
   if (
     !activeMission ||
     !currentLocation
-  )
-    return;
+  ) return;
+
+  const payload = {
+    sosId: activeMission._id,
+    latitude: currentLocation.latitude,
+    longitude: currentLocation.longitude,
+  };
+
+  console.log(
+    "📍 Sending Provider Location",
+    payload
+  );
 
   socket.emit(
-    'provider:location-update',
-    {
-      sosId: activeMission._id,
-      latitude:
-        currentLocation.latitude,
-      longitude:
-        currentLocation.longitude,
-    }
+    "provider:location-update",
+    payload
   );
+
 }, [
   currentLocation,
-  activeMission,
+  activeMission
 ]);
 
 useEffect(() => {
@@ -368,6 +374,58 @@ const updateMissionStatus = async (status) => {
         (sos) =>
           sos.emergencyType === filter
       );
+
+      // Map
+    useEffect(() => {
+
+  if (
+    !activeMission ||
+    !currentLocation ||
+    activeMission.status !==
+      "ON_THE_WAY"
+  ) {
+    return;
+  }
+
+  const distance =
+    calculateDistance(
+      currentLocation.latitude,
+      currentLocation.longitude,
+      activeMission.location.coordinates[1],
+      activeMission.location.coordinates[0]
+    );
+
+  if (distance < 0.05) {
+
+    updateMissionStatus(
+      "ARRIVED"
+    );
+
+    socket.emit(
+      "provider-arrived",
+      {
+        sosId:
+          activeMission._id
+      }
+    );
+  }
+
+}, [
+  currentLocation,
+  activeMission
+]);
+
+const distance =
+  activeMission &&
+  currentLocation &&
+  activeMission.location?.coordinates
+    ? calculateDistance(
+        currentLocation.latitude,
+        currentLocation.longitude,
+        activeMission.location.coordinates[1],
+        activeMission.location.coordinates[0]
+      )
+    : null;
 
   if (loading) return <Loader />;
 
@@ -553,13 +611,13 @@ const updateMissionStatus = async (status) => {
         {/* Active Mission */}
         <div>
           <Card className="sticky top-24 bg-blue-50 border-blue-100">
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-3 mb-4">
               <Navigation className="h-5 w-5 text-blue-600" />
               <h3 className="font-bold text-lg">
                 Active Mission
               </h3>
             {activeMission && (
-  <div className="bg-white rounded-lg p-3">
+  <div className="bg-white rounded-lg p-3 ms-104 mt-2">
     <p className="text-xs text-gray-500">
       Mission Duration
     </p>
@@ -590,10 +648,12 @@ const updateMissionStatus = async (status) => {
   </Card>
 )}
 
+
+
             {activeMission ? (
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-semibold">
+              <div className="space-y-5">
+                <div >
+                  <h4 className="font-semibold mb-1">
                     {
                       activeMission.emergencyType
                     }
@@ -608,7 +668,7 @@ const updateMissionStatus = async (status) => {
                     }
                   </p>
 
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 mb-0.5">
                     Contact:{' '}
                     {
                       activeMission.driverId
@@ -617,15 +677,62 @@ const updateMissionStatus = async (status) => {
                   </p>
                 </div>
 
+{distance !== null && (
+  <div className="grid grid-cols-2 gap-3 mt-3">
+
+    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+      <p className="text-xs text-gray-500 font-semibold">
+        Distance
+      </p>
+
+      <p className="text-2xl font-bold text-green-600">
+        {distance.toFixed(2)}
+      </p>
+
+      <p className="text-xs text-gray-500 font-semibold ">
+        KM Away
+      </p>
+    </div>
+
+    <div className="bg-emerald-100 border border-blue-200 rounded-xl p-4">
+      <p className="text-xs text-gray-500 font-bold">
+        ETA
+      </p>
+
+      <p className="text-2xl font-bold text-blue-600">
+        {Math.ceil(distance / 0.6)}
+      </p>
+
+      <p className="text-xs text-black font-semibold">
+        Minutes
+      </p>
+    </div>
+
+  </div>
+)}
+
     <div className="space-y-3">
       {/* Navigate */}
-    <Button
-    className="w-full"
-    onClick={handleNavigate}
-    disabled={!activeMission?.location?.coordinates}
-    >
-      Navigate
-    </Button>
+<Button
+ className='w-full'
+  onClick={() => {
+
+    const lat =
+      activeMission.location
+        .coordinates[1];
+
+    const lng =
+      activeMission.location
+        .coordinates[0];
+
+    window.open(
+      `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+      "_blank"
+    );
+  }}
+>
+  Navigate
+</Button>
 
   {/* Start Journey */}
   {activeMission?.status === "ACCEPTED" && (
@@ -655,14 +762,35 @@ const updateMissionStatus = async (status) => {
       className="w-full"
       onClick={handleCompleteMission}
     >
-      Resolve Mission
+      Mission Completed
     </Button>
   )}
 
   {/* Status Badge */}
-  <div className="text-center p-2 rounded bg-gray-100 text-sm font-medium">
-    Current Status: {activeMission?.status}
-  </div>
+    <div className="space-y-2">
+
+  {[
+    "ACCEPTED",
+    "ON_THE_WAY",
+    "ARRIVED",
+    "COMPLETED"
+  ].map(step => (
+
+    <div
+      key={step}
+      className={`p-2 rounded-lg ${
+        activeMission.status === step
+          ? "bg-green-500 text-white"
+          : "bg-gray-100"
+      }`}
+    >
+      {step}
+    </div>
+
+  ))}
+   
+    </div>
+
 </div>
 
 

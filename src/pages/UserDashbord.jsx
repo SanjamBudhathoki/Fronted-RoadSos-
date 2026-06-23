@@ -1,4 +1,4 @@
-import React, { useState, useEffect  } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Loader from '../components/Loader';
@@ -6,6 +6,9 @@ import { sosService } from '../services/sosService';
 import { aiService } from '../services/aiService';
 import { AlertTriangle, Mic, Camera, Upload } from 'lucide-react';
 import socket from '../services/socket';
+import { calculateDistance } from '../services/distanceCalculator';
+import LiveTrackingMaps from '../components/LiveTrackingMaps';
+
 
 
 const UserDashboard = () => {
@@ -14,37 +17,47 @@ const UserDashboard = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [analysis, setAnalysis] =useState(null);
+  const [analysis, setAnalysis] = useState(null);
 
 
   const [selectedImage, setSelectedImage] = useState(null);
-const [imagePreview, setImagePreview] = useState(null);
-const [imageLoading, setImageLoading] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageLoading, setImageLoading] = useState(false);
 
-  const fetchMySos = async () => {
-    try {
-      const data = await sosService.getMySos();
+  // keeps a handle on the active SpeechRecognition instance so we can stop it on unmount
+  const recognitionRef = useRef(null);
 
-  setMySosList(data.data || []);
-    } catch (err) {
-      console.error(err);
-      setError('Failed to fetch SOS history.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const activeSos = mySosList.find(
-  sos =>
-    sos.status !== "COMPLETED" &&
-    sos.status !== "CANCELLED"
-);
 
-const hasActiveSos =  mySosList.some(
-    sos =>
-      sos.status !== "COMPLETED" &&
-      sos.status !== "CANCELLED"
+const fetchMySos = async () => {
+  console.log("Hi")
+  try {
+    setLoading(true);
+    const data = await sosService.getMySos();
+    setMySosList(data.data || []);
+  } catch (err) {
+    setError("Failed to fetch SOS history.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+const activeSos = useMemo(() => {
+  const activeStatuses = new Set([
+    "PENDING",
+    "ACCEPTED",
+    "ON_THE_WAY",
+    "ARRIVED"
+  ]);
+
+  return (
+    mySosList.find((s) => activeStatuses.has(s.status)) || null
   );
+}, [mySosList]);
+
+const hasActiveSos = !!activeSos;
+
+
 
   // add ai func
   const analyzeEmergency = async () => {
@@ -64,39 +77,31 @@ const hasActiveSos =  mySosList.some(
   }
 };
 
-
-
 useEffect(() => {
   fetchMySos();
+}, []);
 
-  const interval = setInterval(() => {
-    fetchMySos();
-  }, 5000);
+useEffect(() => {
+  const handleUpdate = (updatedSos) => {
+    setMySosList((prev) =>
+      prev.map((item) =>
+        item._id === updatedSos._id ? updatedSos : item
+      )
+    );
+  };
 
-  if (socket) {
-    socket.on("sos-updated", (updatedSos) => {
-      setMySosList(prev =>
-        prev.map(item =>
-          item._id === updatedSos._id
-            ? updatedSos
-            : item
-        )
-      );
-    });
-  }
+  const handleArrival = () => {
+    setSuccess("🚑 Provider has arrived!");
+  };
+
+  socket.on("sos-updated", handleUpdate);
+  socket.on("provider-arrived", handleArrival);
 
   return () => {
-    clearInterval(interval);
-
-    if (socket) {
-      socket.off("sos-updated");
-    }
-
-    if (imagePreview) {
-      URL.revokeObjectURL(imagePreview);
-    }
+    socket.off("sos-updated", handleUpdate);
+    socket.off("provider-arrived", handleArrival);
   };
-}, [imagePreview]);
+}, []);
 
   const handleTriggerSos = async () => {
     if (!navigator.geolocation) {
@@ -121,7 +126,7 @@ useEffect(() => {
 
 await sosService.createSos(payload);
         setSuccess('SOS triggered successfully! Help is on the way.');
-        fetchMySos(); // Refresh list
+        await fetchMySos(); // Refresh list
       } catch (err) {
         setError('Failed to trigger SOS. Please try again.');
       } finally {
@@ -185,12 +190,14 @@ const handleVoiceSos = async () => {
     }
 
     const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
 
     recognition.lang = "en-US";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
     recognition.onresult = async (event) => {
+      recognition.stop();
       try {
         const transcript =
           event.results[0][0].transcript;
@@ -200,41 +207,54 @@ const handleVoiceSos = async () => {
             transcript
           });
 
-          if (result.data.severity !== "LOW") {
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      await sosService.createSos({
-        emergencyType:
-          result.data.recommendedServices?.[0] ||
-          "GENERAL",
+        const severity = result.data?.severity;
 
-        coordinates: [
-          position.coords.longitude,
-          position.coords.latitude,
-        ],
+        if (severity && severity !== "LOW") {
+          if (hasActiveSos) {
+            // Don't create a second emergency on top of one that's already in progress.
+            setSuccess(
+              `Voice captured: "${transcript}" — you already have an active emergency, so a new SOS was not created.`
+            );
+          } else {
+            navigator.geolocation.getCurrentPosition(
+              async (position) => {
+                await sosService.createSos({
+                  emergencyType:
+                    result.data.recommendedServices?.[0] ||
+                    "GENERAL",
 
-        notes: transcript,
-      });
+                  coordinates: [
+                    position.coords.longitude,
+                    position.coords.latitude,
+                  ],
 
-      fetchMySos();
+                  notes: transcript,
+                });
 
-      setSuccess(
-        "Emergency detected and SOS created automatically."
-      );
-    }
-  );
-}
+                fetchMySos();
+
+                setSuccess(
+                  "Emergency detected and SOS created automatically."
+                );
+              }
+            );
+          }
+        } else {
+          setSuccess(`Voice captured: "${transcript}"`);
+        }
 
         setAnalysis(result.data);
-        setSuccess(`Voice captured: "${transcript}"`);
       } catch (err) {
         console.error(err);
         setError("Voice analysis failed.");
+      } finally {
+        recognitionRef.current = null;
       }
     };
 
     recognition.onerror = () => {
       setError("Voice recognition failed.");
+      recognitionRef.current = null;
     };
 
     recognition.start();
@@ -243,6 +263,16 @@ const handleVoiceSos = async () => {
     setError("Unable to start voice recognition.");
   }
 };
+
+// Stop any in-flight speech recognition if the component unmounts mid-recording.
+useEffect(() => {
+  return () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+  };
+}, []);
 
 const handleCancelSOS = async (id) => {
   try {
@@ -262,6 +292,56 @@ const handleCancelSOS = async (id) => {
   }
 };
 
+
+//for live tracking
+const [providerLocation, setProviderLocation] = useState(null);
+const activeSosId = activeSos?._id;
+
+// Clear any marker/ETA left over from a previous (or now-finished) emergency
+// whenever the active SOS changes, so a stale provider position never lingers.
+useEffect(() => {
+  setProviderLocation(null);
+}, [activeSosId]);
+
+useEffect(() => {
+  const handleLocationUpdate = (data) => {
+    if (!activeSosId) return;
+    if (String(data.sosId) !== String(activeSosId)) return;
+
+    const lat = Number(data.latitude);
+    const lng = Number(data.longitude);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    setProviderLocation([lat, lng]);
+  };
+
+  socket.on("provider:location-updated", handleLocationUpdate);
+
+  return () => {
+    socket.off("provider:location-updated", handleLocationUpdate);
+  };
+}, [activeSosId]);
+
+
+  // console.log(activeSos)
+  //offline Banner
+const [online, setOnline] =useState(navigator.onLine);
+
+useEffect(() => {
+  const onOnline = () => setOnline(true);
+  const onOffline = () => setOnline(false);
+
+  window.addEventListener("online", onOnline);
+  window.addEventListener("offline", onOffline);
+
+  return () => {
+    window.removeEventListener("online", onOnline);
+    window.removeEventListener("offline", onOffline);
+  };
+
+}, []);
+
   if (loading) return <Loader />;
  
   const steps = [
@@ -273,7 +353,19 @@ const handleCancelSOS = async (id) => {
 ];
 
 return (
+  
+  
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+      {
+ !online &&
+ (
+  <div className="bg-red-500 text-white p-3 rounded mb-4">
+     ⚠ Offline Mode Active.
+     Emergency requests will be stored
+     and sent automatically.
+  </div>
+ )
+}
       <h1 className="text-2xl font-bold text-gray-900 mb-6">User Dashboard</h1>
       
       {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
@@ -412,6 +504,7 @@ return (
       </div>
       
       {activeSos && (
+
   <Card className="mb-6 border-red-300 bg-red-50 md:col-span-2">
     <div className="flex justify-between items-center">
       <div>
@@ -459,6 +552,57 @@ return (
         </div>
       ))}
     </div>
+  </Card>
+
+)}
+
+{/* Maps  */}
+{activeSos && (
+  <Card className="mb-6">
+
+    <h2 className="font-bold text-lg mb-4">
+      Live Rescue Tracking
+    </h2>
+
+{activeSos?.location?.coordinates?.length >= 2 && (
+  <LiveTrackingMaps
+    userLocation={[
+      activeSos.location.coordinates[1], // latitude
+      activeSos.location.coordinates[0], // longitude
+    ]}
+    providerLocation={providerLocation}
+  />
+)}
+
+  </Card>
+)}
+
+{/* Live ETA */}
+{providerLocation &&  activeSos?.location?.coordinates?.length >= 2 && (
+  <Card className="mt-4">
+    <p>
+      Distance:{" "}
+      {calculateDistance(
+        providerLocation[0],
+        providerLocation[1],
+        activeSos.location.coordinates[1],
+        activeSos.location.coordinates[0]
+      ).toFixed(2)}
+      km
+    </p>
+
+    <p>
+      ETA:{" "}
+      {Math.ceil(
+        calculateDistance(
+          providerLocation[0],
+          providerLocation[1],
+          activeSos.location.coordinates[1],
+          activeSos.location.coordinates[0]
+        ) / 0.6
+      )}
+      mins
+    </p>
   </Card>
 )}
 
@@ -553,23 +697,15 @@ return (
             <p className="text-gray-500 text-center py-4">No SOS requests found.</p>
           </Card>
         ) : (
+
           mySosList.map((sos) => (
-            <Card key={sos._id} className="flex justify-between items-center">
+            <Card key={sos._id} className="flex justify-between items-center-safe">
               <div>
                 <p className="font-semibold text-gray-800">{sos.emergencyType}</p>
                 <p className="text-sm text-gray-500">Status: <span className="font-medium text-gray-900">{sos.status}</span></p>
                 <p className="text-xs text-gray-400">{new Date(sos.createdAt).toLocaleString()}</p>
               </div>
-{activeSos?.providerId && (
-  <Card className="mt-4">
-    <h3 className="font-bold mb-3">
-      Assigned Provider
-    </h3>
-
-    <p>Name: {`${activeSos.providerId.firstName} ${activeSos.providerId.lastName}`} </p>
-    <p>Phone: {activeSos.providerId.phone}</p>
-  </Card>
-)}
+              
 
               <div>
                 <span
@@ -591,11 +727,18 @@ return (
             </Card>
           ))
         )}
+        {activeSos?.providerId && (
+  <Card className="mb-4">
+    <h3 className="font-bold mb-3">Assigned Provider</h3>
+    <p>
+      Name: {activeSos.providerId.firstName} {activeSos.providerId.lastName}
+    </p>
+    <p>Phone: {activeSos.providerId.phone}</p>
+  </Card>
+)}
       </div>
     </div>
   );
 };
 
 export default UserDashboard;
-
-

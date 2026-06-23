@@ -8,7 +8,7 @@ import NotificationBell from "./NotifyBell";
 const NAV_ITEMS = [
   { id: 1, name: "Home", path: "/home" },
   { id: 2, name: "Services", path: "/services" },
-  { id: 3, name: "AI Technology", path: "/ai-tech" },
+  // { id: 3, name: "AI Technology", path: "/ai-tech" },
   { id: 4, name: "Support", path: "/support" },
 ];
 

@@ -3,6 +3,7 @@ import Home from '../pages/Home';
 import UserDashboard from '../pages/UserDashbord';
 import ProviderDashboard from '../pages/ProviderDashbord';
 import UserProfile from '../pages/UserProfile';
+import LiveTrackingMaps from '../components/LiveTrackingMaps';
 
 const mainRoutes =  [
   {
@@ -23,7 +24,11 @@ const mainRoutes =  [
   {
     path: "/user/profile",
     element: <UserProfile />,
-  }
+  },
+{  
+  path:"/map",
+  element:<LiveTrackingMaps/>
+}
 ];
 
 
