@@ -31,3 +31,10 @@ createRoot(document.getElementById("root")).render(
     </QueryClientProvider>
   </React.StrictMode>
 );
+
+
+
+/* how to make a react project a working app like i was 
+ used to React and make a full application ,'
+  now i need a mobile app, how to do it step
+  wise step process this is my web app code i */

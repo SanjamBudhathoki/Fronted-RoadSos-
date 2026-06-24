@@ -28,7 +28,8 @@ const mainRoutes =  [
 {  
   path:"/map",
   element:<LiveTrackingMaps/>
-}
+},
+
 ];
 
 

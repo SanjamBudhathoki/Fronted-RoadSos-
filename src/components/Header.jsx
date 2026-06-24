@@ -12,18 +12,22 @@ import {
   Home,
   Activity,
   Wifi,
-  WifiOff
+  WifiOff,
+  Zap,
+  LayoutDashboard,
+  LayoutDashboardIcon
 } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Button from "./Button";
 import NotificationBell from "./NotifyBell";
+import Logo from "./Logo"
 
 const NAV_ITEMS = [
   { id: 1, name: "Home", path: "/", icon: <Home size={16} /> },
-  { id: 2, name: "Dashboard", path: "/user/dashbord", icon: <Activity size={16} /> },
-  { id: 3, name: "Services", path: "/services", icon: <HelpCircle size={16} /> },
-  { id: 4, name: "Support", path: "/support", icon: <HelpCircle size={16} /> },
+  { id: 2, name: "User Dashboard", path: "/user/dashbord", icon: <Activity size={16} /> },
+  { id: 3, name: "Provider Dashboard", path: "/provider/dashbord", icon: <LayoutDashboardIcon size={16} /> }
+
 ];
 
 const getUserInitial = (user) => {
@@ -54,7 +58,7 @@ const UserProfile = ({ user, onLogout }) => {
         className="flex items-center gap-3 group p-1.5 rounded-xl hover:bg-gray-50 transition-all duration-200"
       >
         <div
-          className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-red-500 to-red-700 text-white flex items-center justify-center font-bold border-2 border-white shadow-md group-hover:scale-105 group-hover:shadow-lg transition-all duration-200 ring-2 ring-red-100"
+          className="w-10 h-10 rounded-full overflow-hidden bg-linear-to-br from-red-500 to-red-700 text-white flex items-center justify-center font-bold border-2 border-white shadow-md group-hover:scale-105 group-hover:shadow-lg transition-all duration-200 ring-2 ring-red-100"
           title={`${user?.firstName} ${user?.lastName || ''} (${user?.role})`}
         >
           {profileImage ? (
@@ -118,16 +122,6 @@ const UserProfile = ({ user, onLogout }) => {
                 View Profile
               </button>
               
-              <button
-                onClick={() => {
-                  navigate('/settings');
-                  setShowDropdown(false);
-                }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <Settings size={16} className="text-gray-400" />
-                Settings
-              </button>
             </div>
 
             {/* Logout */}
@@ -150,19 +144,7 @@ const UserProfile = ({ user, onLogout }) => {
   );
 };
 
-const Logo = () => (
-  <Link to="/" className="flex items-center gap-2.5 group">
-    <div className="p-2 bg-red-50 rounded-xl group-hover:bg-red-100 transition-colors duration-200">
-      <ShieldAlert className="h-6 w-6 text-red-600" aria-hidden="true" />
-    </div>
-    <div>
-      <span className="text-xl font-bold text-gray-900">
-        Road<span className="text-red-600">SOS</span>
-      </span>
-      <p className="text-[10px] text-gray-500 leading-tight -mt-0.5">Emergency Response</p>
-    </div>
-  </Link>
-);
+
 
 const NavLink = ({ item, onClick, isActive }) => (
   <Link
@@ -207,7 +189,7 @@ const DesktopNav = ({ isAuthenticated, user, onLogout, currentPath }) => (
           </Link>
           <Link
             to="/register"
-            className="text-sm font-semibold px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-red-500 text-white hover:from-red-700 hover:to-red-600 transition-all duration-200 shadow-md hover:shadow-lg"
+            className="text-sm font-semibold px-5 py-2.5 rounded-xl bg-linear-to-r from-red-600 to-red-500 text-white hover:from-red-700 hover:to-red-600 transition-all duration-200 shadow-md hover:shadow-lg"
           >
             Get Started
           </Link>
@@ -244,7 +226,7 @@ const MobileNav = ({ isOpen, isAuthenticated, user, onClose, onLogout, currentPa
           {isAuthenticated ? (
             <div className="space-y-2">
               <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-xl">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500 to-red-700 text-white flex items-center justify-center font-bold text-sm">
+                <div className="w-10 h-10 rounded-full bg-linear-to-br from-red-500 to-red-700 text-white flex items-center justify-center font-bold text-sm">
                   {getUserInitial(user)}
                 </div>
                 <div>
@@ -287,7 +269,7 @@ const MobileNav = ({ isOpen, isAuthenticated, user, onClose, onLogout, currentPa
               <Link
                 to="/register"
                 onClick={onClose}
-                className="block px-4 py-2.5 text-sm font-semibold bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl text-center shadow-md"
+                className="block px-4 py-2.5 text-sm font-semibold bg-linear-to-r from-red-600 to-red-500 text-white rounded-xl text-center shadow-md"
               >
                 Get Started
               </Link>
@@ -401,6 +383,7 @@ const Header = () => {
       />
     </header>
   );
+
 };
 
 export default Header;

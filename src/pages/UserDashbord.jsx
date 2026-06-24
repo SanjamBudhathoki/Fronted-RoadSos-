@@ -673,7 +673,7 @@ const UserDashboard = () => {
 
       {/* AI Analysis */}
       {analysis && (
-        <Card className="mb-6 border-indigo-200 bg-gradient-to-r from-indigo-50 to-white">
+        <Card className="mb-6 border-indigo-200 bg-linear-to-r from-indigo-50 to-white">
           <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-indigo-600" />
             AI Emergency Assessment

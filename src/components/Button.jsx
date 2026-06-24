@@ -58,7 +58,7 @@ const Button = ({
         </>
       ) : (
         <>
-          {icon && <span className="flex-shrink-0">{icon}</span>}
+          {icon && <span className="shrink-0">{icon}</span>}
           {children}
         </>
       )}
