@@ -3,16 +3,27 @@ import { saveOfflineSOS } from "./offlineSOS";
 
 export const sosService = {
   createSos: async (data) => {
-    try {
-     const response =  await $port.post('/sos/create', data);
+  try {
+    const payload = {
+      emergencyType: data.emergencyType,
+      coordinates: data.coordinates,
+      notes: data.notes || "",
+      imageUrl: data.imageUrl || null,
+      imagePublicId: data.imagePublicId || null,
+      aiAnalysisResult: data.aiAnalysisResult || null,
+    };
+
+    const response = await $port.post('/sos/create', payload);
     return response.data;
-    } catch (error) {
-      saveOfflineSOS({
-        ...data,
-        createdAt:Date.now()
-      })
-    } 
-  },
+  } catch (error) {
+    // Fallback to offline storage
+    saveOfflineSOS({
+      ...data,
+      createdAt: Date.now()
+    });
+    throw error;
+  }
+},
   getMySos: async () => {
     const response = await $port.get('/sos/my');
     return response.data;

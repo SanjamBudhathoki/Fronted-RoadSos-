@@ -4,7 +4,7 @@ import Button from '../components/Button';
 import Loader from '../components/Loader';
 import { sosService } from '../services/sosService';
 import { aiService } from '../services/aiService';
-import { AlertTriangle, Mic, Camera, Upload } from 'lucide-react';
+import { AlertTriangle, Mic, Camera, Upload, Image as ImageIcon } from 'lucide-react';
 import socket from '../services/socket';
 import { calculateDistance } from '../services/distanceCalculator';
 import LiveTrackingMaps from '../components/LiveTrackingMaps';
@@ -21,6 +21,7 @@ const UserDashboard = () => {
   const [imageLoading, setImageLoading] = useState(false);
   const [providerLocation, setProviderLocation] = useState(null);
   const [online, setOnline] = useState(navigator.onLine);
+  const [pendingEmergencyData, setPendingEmergencyData] = useState(null);
   
   const recognitionRef = useRef(null);
   const successTimeoutRef = useRef(null);
@@ -55,24 +56,38 @@ const UserDashboard = () => {
   const hasActiveSos = !!activeSos;
   const activeSosId = activeSos?._id;
 
-  // AI analysis
-  const analyzeEmergency = async () => {
+  //  PROBLEM 4 FIXED: AI analysis with real data
+  const analyzeEmergency = async (emergencyData = null) => {
     try {
-      const result = await aiService.analyzeEmergency({
+      const data = emergencyData || {
         emergencyType: "GENERAL",
-        description: "Vehicle accident on highway"
-      });
+        description: "Emergency assistance needed"
+      };
+      
+      const result = await aiService.analyzeEmergency(data);
       setAnalysis(result.data);
+      return result.data;
     } catch (error) {
-      console.error(error);
+      console.error('Emergency analysis failed:', error);
+      return null;
     }
   };
+
+  //  PROBLEM 4 FIXED: Auto-analyze active emergency with real data
+  useEffect(() => {
+    if (activeSos?.notes) {
+      analyzeEmergency({
+        emergencyType: activeSos.emergencyType || "GENERAL",
+        description: activeSos.notes || `Emergency: ${activeSos.emergencyType}`
+      });
+    }
+  }, [activeSos?._id]);
 
   useEffect(() => {
     fetchMySos();
   }, []);
 
-  // 🔧 Listen for SOS status updates
+  // Listen for SOS status updates
   useEffect(() => {
     const handleStatusUpdate = ({ sosId, status }) => {
       console.log("📊 Status update received:", { sosId, status });
@@ -96,23 +111,23 @@ const UserDashboard = () => {
     };
   }, []);
 
-  // 🔧 Clear provider location when active SOS changes
+  // Clear provider location when active SOS changes
   useEffect(() => {
     setProviderLocation(null);
   }, [activeSosId]);
 
-  // 🔧 FIXED: Listen for provider location updates
+  // Listen for provider location updates
   useEffect(() => {
     const handleLocationUpdate = (data) => {
       console.log("📍 Received provider location:", data);
       
       if (!activeSosId) {
-        console.warn("⚠️ No active SOS ID, ignoring location update");
+        console.warn(" No active SOS ID, ignoring location update");
         return;
       }
       
       if (String(data.sosId) !== String(activeSosId)) {
-        console.warn("⚠️ SOS ID mismatch:", {
+        console.warn(" SOS ID mismatch:", {
           received: data.sosId,
           current: activeSosId
         });
@@ -123,22 +138,20 @@ const UserDashboard = () => {
       const lng = Number(data.longitude);
 
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        console.warn("⚠️ Invalid coordinates:", { lat, lng });
+        console.warn(" Invalid coordinates:", { lat, lng });
         return;
       }
 
-      console.log("✅ Setting provider location:", [lat, lng]);
+      console.log(" Setting provider location:", [lat, lng]);
       setProviderLocation([lat, lng]);
     };
 
-    console.log("👂 Listening for provider location updates...");
+    console.log(" Listening for provider location updates...");
     socket.on("provider:location-update", handleLocationUpdate);
-
-    // Also listen for the alternative event name
     socket.on("provider:location-updated", handleLocationUpdate);
 
     return () => {
-      console.log("🔇 Stopped listening for provider location updates");
+      console.log("Stopped listening for provider location updates");
       socket.off("provider:location-update", handleLocationUpdate);
       socket.off("provider:location-updated", handleLocationUpdate);
     };
@@ -166,7 +179,8 @@ const UserDashboard = () => {
     };
   }, []);
 
-  const handleTriggerSos = async () => {
+  // SOS with real data and image attachment
+  const handleTriggerSos = async (emergencyData = {}) => {
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by your browser.');
       return;
@@ -176,19 +190,47 @@ const UserDashboard = () => {
     setError('');
     setSuccess('');
 
+    // Get real description from user if not provided
+    const userDescription = emergencyData.notes || window.prompt(
+      'Briefly describe your emergency (optional):', 
+      ''
+    ) || 'Emergency assistance needed';
+
     navigator.geolocation.getCurrentPosition(async (position) => {
       try {
+        //  Merge pending image/AI data with SOS payload
         const payload = {
-          emergencyType: "GENERAL",
+          emergencyType: emergencyData.emergencyType || pendingEmergencyData?.aiAnalysisResult?.recommendedServices?.[0] || "GENERAL",
           coordinates: [
             position.coords.longitude,
             position.coords.latitude
           ],
-          notes: ""
+          notes: userDescription,
+          // Include image and AI analysis
+          imageUrl: emergencyData.imageUrl || pendingEmergencyData?.imageUrl || null,
+          imageFilename: emergencyData.imageFilename || pendingEmergencyData?.imageFilename || null,
+          aiAnalysisResult: emergencyData.aiAnalysisResult || pendingEmergencyData?.aiAnalysisResult || null,
         };
 
         await sosService.createSos(payload);
-        setSuccess('SOS triggered successfully! Help is on the way.');
+        setSuccess('🚨 SOS triggered successfully! Help is on the way.');
+        
+        //  Analyze with real data
+        analyzeEmergency({
+          emergencyType: payload.emergencyType,
+          description: payload.notes
+        });
+        
+        //  Show analysis if available
+        if (payload.aiAnalysisResult) {
+          setAnalysis(payload.aiAnalysisResult);
+        }
+        
+        //  Clean up
+        setPendingEmergencyData(null);
+        setSelectedImage(null);
+        setImagePreview(null);
+        
         await fetchMySos();
       } catch (err) {
         setError('Failed to trigger SOS. Please try again.');
@@ -204,6 +246,20 @@ const UserDashboard = () => {
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Image size should be less than 10MB");
+      return;
+    }
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      setError("Please upload a valid image (JPEG, PNG, WebP, or GIF)");
+      return;
+    }
+    
     setSelectedImage(file);
     setImagePreview(URL.createObjectURL(file));
   };
@@ -218,12 +274,31 @@ const UserDashboard = () => {
       setImageLoading(true);
       setError('');
       setSuccess('');
+
       const result = await aiService.analyzeImage(selectedImage);
-      setAnalysis(result.data);
-      setSuccess("Image analyzed successfully.");
+      const analysisData = result.data;
+      
+      // Show analysis
+      setAnalysis(analysisData);
+      
+      //  Store for SOS creation
+      setPendingEmergencyData({
+        imageUrl: analysisData.imageUrl,
+        imageFilename: analysisData.imageFilename,
+        aiAnalysisResult: {
+          severity: analysisData.severity,
+          priorityScore: analysisData.priorityScore,
+          recommendedServices: analysisData.recommendedServices || [],
+          reason: analysisData.reason,
+          safetyInstructions: analysisData.safetyInstructions,
+          confidence: 0.9,
+        },
+      });
+      
+      setSuccess(" Image analyzed! Click 'Trigger SOS Now' to create emergency with photo evidence.");
     } catch (err) {
       console.error(err);
-      setError("Failed to analyze image.");
+      setError("Failed to analyze image. Please try again.");
     } finally {
       setImageLoading(false);
     }
@@ -249,26 +324,47 @@ const UserDashboard = () => {
         try {
           const transcript = event.results[0][0].transcript;
           const result = await aiService.voiceSos({ transcript });
-          const severity = result.data?.severity;
+          const voiceData = result.data;
 
-          if (severity && severity !== "LOW") {
+          console.log("🎤 Voice analysis result:", voiceData);
+
+          if (voiceData.severity === "HIGH" || voiceData.severity === "CRITICAL") {
             if (hasActiveSos) {
               setSuccess(`Voice captured: "${transcript}" — you already have an active emergency.`);
             } else {
               navigator.geolocation.getCurrentPosition(async (position) => {
                 await sosService.createSos({
-                  emergencyType: result.data.recommendedServices?.[0] || "GENERAL",
+                  emergencyType: voiceData.incidentType || "GENERAL",
                   coordinates: [position.coords.longitude, position.coords.latitude],
                   notes: transcript,
+                  aiAnalysisResult: {
+                    severity: voiceData.severity,
+                    priorityScore: voiceData.priorityScore,
+                    recommendedServices: voiceData.recommendedServices || [],
+                    reason: voiceData.reason,
+                    safetyInstructions: voiceData.safetyInstructions,
+                    confidence: 0.9,
+                  },
                 });
                 fetchMySos();
-                setSuccess("Emergency detected and SOS created automatically.");
+                setSuccess("🚨 Emergency detected from voice! SOS created automatically.");
               });
             }
           } else {
-            setSuccess(`Voice captured: "${transcript}"`);
+            setSuccess(`Voice captured: "${transcript}". Severity: ${voiceData.severity || 'LOW'}`);
           }
-          setAnalysis(result.data);
+
+          // Show full analysis
+          setAnalysis({
+            severity: voiceData.severity,
+            priorityScore: voiceData.priorityScore,
+            reason: voiceData.reason,
+            summary: voiceData.summary,
+            recommendedServices: voiceData.recommendedServices,
+            safetyInstructions: voiceData.safetyInstructions,
+            injuredCount: voiceData.injuredCount,
+            medicalRequired: voiceData.medicalRequired,
+          });
         } catch (err) {
           console.error(err);
           setError("Voice analysis failed.");
@@ -277,9 +373,14 @@ const UserDashboard = () => {
         }
       };
 
-      recognition.onerror = () => {
-        setError("Voice recognition failed.");
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        setError(`Voice recognition failed: ${event.error}`);
         recognitionRef.current = null;
+      };
+
+      recognition.onend = () => {
+        console.log("Speech recognition ended");
       };
 
       recognition.start();
@@ -308,7 +409,6 @@ const UserDashboard = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-      {/* Debug Panel - Remove after testing */}
       {activeSos && (
         <div className="mb-4 p-3 bg-gray-50 border border-gray-300 rounded-lg text-xs font-mono">
           <p className="font-bold text-sm mb-2">🔍 Debug:</p>
@@ -324,13 +424,13 @@ const UserDashboard = () => {
             <div>
               <p className="text-gray-500">Socket:</p>
               <p className={`font-semibold ${socket.connected ? 'text-green-600' : 'text-red-600'}`}>
-                {socket.connected ? '✅ Connected' : '❌ Disconnected'}
+                {socket.connected ? ' Connected' : '❌ Disconnected'}
               </p>
             </div>
             <div>
               <p className="text-gray-500">Provider:</p>
               <p className={`font-semibold ${providerLocation ? 'text-green-600' : 'text-red-600'}`}>
-                {providerLocation ? '✅ Received' : '⏳ Waiting'}
+                {providerLocation ? ' Received' : '⏳ Waiting'}
               </p>
             </div>
             <div>
@@ -372,11 +472,27 @@ const UserDashboard = () => {
           <Button
             variant="danger"
             className="w-full text-lg py-4 uppercase tracking-widest"
-            onClick={handleTriggerSos}
+            onClick={() => handleTriggerSos(pendingEmergencyData || {})}
             disabled={actionLoading || hasActiveSos}
           >
-            {actionLoading ? "Broadcasting..." : hasActiveSos ? "Emergency Active" : "Trigger SOS Now"}
+            {actionLoading ? (
+              "Broadcasting..."
+            ) : hasActiveSos ? (
+              "Emergency Active"
+            ) : pendingEmergencyData ? (
+              "📸 Send SOS with Photo Evidence"
+            ) : (
+              "Trigger SOS Now"
+            )}
           </Button>
+          
+          {/*  Show pending evidence indicator */}
+          {pendingEmergencyData && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-full">
+              <ImageIcon className="h-3 w-3" />
+              Photo evidence ready - will be included with SOS
+            </div>
+          )}
         </Card>
 
         <div className="space-y-6">
@@ -384,7 +500,7 @@ const UserDashboard = () => {
             <h3 className="font-semibold text-gray-800 flex items-center gap-2 mb-4">
               <Mic className="h-5 w-5 text-blue-500" /> AI Voice Analysis
             </h3>
-            <p className="text-sm text-gray-600 mb-4">Describe your emergency using voice.</p>
+            <p className="text-sm text-gray-600 mb-4">Describe your emergency using voice. High/Critical emergencies auto-trigger SOS.</p>
             <Button variant="secondary" className="w-full" onClick={handleVoiceSos}>
               Start Recording
             </Button>
@@ -557,20 +673,43 @@ const UserDashboard = () => {
 
       {/* AI Analysis */}
       {analysis && (
-        <Card className="mb-6">
-          <h3 className="font-bold mb-4">AI Emergency Assessment</h3>
+        <Card className="mb-6 border-indigo-200 bg-gradient-to-r from-indigo-50 to-white">
+          <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-indigo-600" />
+            AI Emergency Assessment
+          </h3>
           <div className="space-y-3">
-            <div><strong>Severity:</strong> {analysis.severity}</div>
-            <div><strong>Priority:</strong> {analysis.priorityScore}</div>
-            <div><strong>Reason:</strong> {analysis.reason}</div>
-            {analysis.recommendedServices && (
+            <div className="flex items-center gap-2">
+              <strong>Severity:</strong>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                analysis.severity === 'CRITICAL' ? 'bg-red-100 text-red-700' :
+                analysis.severity === 'HIGH' ? 'bg-orange-100 text-orange-700' :
+                analysis.severity === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-green-100 text-green-700'
+              }`}>
+                {analysis.severity}
+              </span>
+            </div>
+            <div><strong>Priority Score:</strong> {analysis.priorityScore}/100</div>
+            {analysis.reason && <div><strong>Analysis:</strong> {analysis.reason}</div>}
+            {analysis.summary && <div><strong>Summary:</strong> {analysis.summary}</div>}
+            {analysis.injuredCount > 0 && <div><strong>Injured:</strong> {analysis.injuredCount} person(s)</div>}
+            {analysis.safetyInstructions && (
+              <div className="bg-white p-3 rounded-lg border border-indigo-100">
+                <strong> Safety Instructions:</strong>
+                <p className="text-sm mt-1">{analysis.safetyInstructions}</p>
+              </div>
+            )}
+            {analysis.recommendedServices && analysis.recommendedServices.length > 0 && (
               <div>
                 <strong>Recommended Services:</strong>
-                <ul className="list-disc pl-5 mt-2">
+                <div className="flex flex-wrap gap-2 mt-2">
                   {analysis.recommendedServices.map((service, index) => (
-                    <li key={index}>{service}</li>
+                    <span key={index} className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium">
+                      {service}
+                    </span>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
           </div>
@@ -594,7 +733,11 @@ const UserDashboard = () => {
                 </p>
                 <p className="text-xs text-gray-400">{new Date(sos.createdAt).toLocaleString()}</p>
               </div>
-              <div>
+              <div className="flex items-center gap-2">
+                {/*  Show image indicator if SOS has image */}
+                {sos.aiAnalysis?.image_url && (
+                  <span title="Has photo evidence">📸</span>
+                )}
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                   sos.status === "PENDING" ? "bg-yellow-100 text-yellow-800"
                   : sos.status === "ACCEPTED" ? "bg-blue-100 text-blue-800"

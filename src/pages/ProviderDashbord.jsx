@@ -490,6 +490,20 @@ const ProviderDashboard = () => {
               </Card>
             )}
 
+{/* //! Image gisplay*/}
+{activeMission?.aiAnalysis?.image_url && (
+  <div className="mt-4">
+    <h4 className="font-semibold mb-2">📸 Emergency Evidence</h4>
+    <img 
+      src={activeMission.aiAnalysis.image_url} 
+      alt="Emergency scene"
+      className="w-full h-48 object-cover rounded-xl border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+      onClick={() => window.open(activeMission.aiAnalysis.image_url, '_blank')}
+    />
+    <p className="text-xs text-gray-500 mt-1">Click to view full size</p>
+  </div>
+)}
+
             {activeMission ? (
               <div className="space-y-5">
                 <div>
