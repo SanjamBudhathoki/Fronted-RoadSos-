@@ -1,7 +1,4 @@
 RoasSos
-│   public
-│   ├── favicon.svg
-│   └── icons.svg
 │   src
 │   ├── assets
 │   │   ├── hero.png
@@ -18,6 +15,7 @@ RoasSos
 │   │   ├── LiveTrackingMaps.jsx
 │   │   ├── Loader.jsx
 │   │   ├── LoginForm.jsx
+│   │   ├── Logo.jsx
 │   │   ├── NotifyBell.jsx
 │   │   ├── ProjectRoute.jsx
 │   │   ├── RegisterForm.jsx
@@ -51,7 +49,6 @@ RoasSos
 │   .env
 │   .gitignore
 │   eslint.config.js
-│   Frontend.zip
 │   index.html
 │   package-lock.json
 │   package.json
