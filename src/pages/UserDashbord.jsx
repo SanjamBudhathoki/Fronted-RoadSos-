@@ -33,9 +33,9 @@ const UserDashboard = () => {
   const [providerLocation, setProviderLocation] = useState(null);
   const [online, setOnline] = useState(navigator.onLine);
   const [pendingEmergencyData, setPendingEmergencyData] = useState(null);
-  
-const [voiceLoading, setVoiceLoading] = useState(false);
-const recognitionRef = useRef(null);
+  const [voiceLoading, setVoiceLoading] = useState(false);
+
+  const recognitionRef = useRef(null);
   const successTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -161,9 +161,9 @@ const recognitionRef = useRef(null);
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        recognitionRef.current.abort();
         recognitionRef.current = null;
-      };
+      }
     };
   }, []);
 
@@ -207,11 +207,7 @@ const recognitionRef = useRef(null);
           await sosService.createSos(payload);
           setSuccess("SOS triggered successfully! Help is on the way.");
 
-          analyzeEmergency({
-            emergencyType: payload.emergencyType,
-            description: payload.notes,
-          });
-
+          // Removed duplicate analyzeEmergency call – the useEffect on activeSos will handle it.
           if (payload.aiAnalysisResult) {
             setAnalysis(payload.aiAnalysisResult);
           }
@@ -300,80 +296,67 @@ const recognitionRef = useRef(null);
     }
   };
 
-const handleVoiceSos = () => {
-  const SpeechRecognition =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
+  const handleVoiceSos = () => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  if (!SpeechRecognition) {
-    alert("Speech recognition not supported in this browser.");
-    return;
-  }
+    if (!SpeechRecognition) {
+      alert("Speech recognition not supported in this browser.");
+      return;
+    }
 
-  // Prevent starting a new recognition if one is already active
-  if (recognitionRef.current) {
-    recognitionRef.current.abort();
-  }
+    if (recognitionRef.current) {
+      recognitionRef.current.abort();
+    }
 
-  const recognition = new SpeechRecognition();
-  recognitionRef.current = recognition;
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
 
-  recognition.lang = "en-US";
-  recognition.continuous = false;
-  recognition.interimResults = false;       // ← only final transcript
-  recognition.maxAlternatives = 1;
+    recognition.lang = "en-US";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
 
-  recognition.onstart = () => {
-    setVoiceLoading(true);
-    setError("");
-  };
+    recognition.onstart = () => {
+      setVoiceLoading(true);
+      setError("");
+    };
 
-  recognition.onresult = async (event) => {
-    try {
-      const result = event.results[0];
-      if (!result.isFinal) return;          // safety guard
+    recognition.onresult = async (event) => {
+      try {
+        const result = event.results[0];
+        if (!result.isFinal) return;
 
-      const transcript = result[0].transcript.trim();
-      if (!transcript) return;
+        const transcript = result[0].transcript.trim();
+        if (!transcript) return;
 
-      console.log("FINAL TRANSCRIPT:", transcript);
+        console.log("FINAL TRANSCRIPT:", transcript);
 
-      const response = await aiService.voiceSos({ transcript });
-      console.log("BACKEND RESPONSE:", response);
+        const response = await aiService.voiceSos({ transcript });
+        console.log("BACKEND RESPONSE:", response);
+      } catch (error) {
+        console.error("VOICE API ERROR:", error);
+        setError("Voice analysis failed. Please try again.");
+      } finally {
+        setVoiceLoading(false);
+        recognitionRef.current = null;
+      }
+    };
 
-      // Optional: handle the response (show analysis, trigger SOS etc.)
-      // e.g. if response.data.emergencyDetected then auto‑trigger SOS
-
-    } catch (error) {
-      console.error("VOICE API ERROR:", error);
-      setError("Voice analysis failed. Please try again.");
-    } finally {
+    recognition.onerror = (event) => {
+      console.error("RECOGNITION ERROR:", event.error);
+      setError(`Voice error: ${event.error}`);
       setVoiceLoading(false);
       recognitionRef.current = null;
-    }
+    };
+
+    recognition.onend = () => {
+      setVoiceLoading(false);
+      recognitionRef.current = null;
+    };
+
+    recognition.start();
   };
-
-  recognition.onerror = (event) => {
-    console.error("RECOGNITION ERROR:", event.error);
-    setError(`Voice error: ${event.error}`);
-    setVoiceLoading(false);
-    recognitionRef.current = null;
-  };
-
-  recognition.onend = () => {
-    setVoiceLoading(false);
-    recognitionRef.current = null;
-  };
-
-  recognition.start();
-};
-
-// Cleanup on unmount
-useEffect(() => {
-  return () => {
-    recognitionRef.current?.abort();
-  };
-}, []);
-
 
   const handleCancelSOS = async (id) => {
     try {
@@ -550,19 +533,19 @@ useEffect(() => {
               <p className="text-sm text-gray-600 mb-4">
                 Describe your emergency using voice for instant AI assessment.
               </p>
-<Button
-  variant="secondary"
-  className="w-full rounded-xl"
-  onClick={handleVoiceSos}
-  disabled={voiceLoading}
->
-  {voiceLoading ? (
-    <Loader className="h-4 w-4 animate-spin mr-2" />
-  ) : (
-    <Mic className="w-4 h-4 mr-2" />
-  )}
-  {voiceLoading ? "Listening…" : "Start Recording"}
-</Button>
+              <Button
+                variant="secondary"
+                className="w-full rounded-xl"
+                onClick={handleVoiceSos}
+                disabled={voiceLoading}
+              >
+                {voiceLoading ? (
+                  <Loader className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Mic className="w-4 h-4 mr-2" />
+                )}
+                {voiceLoading ? "Listening…" : "Start Recording"}
+              </Button>
             </div>
           </Card>
 
