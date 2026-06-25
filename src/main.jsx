@@ -9,6 +9,8 @@ import MainLayout from "./layout/MainLayout.jsx";
 import mainRoutes from "./routes/main.routes.jsx";
 import { NotificationProvider } from "./context/NotificationContext.jsx";
 import { syncOfflineSOS } from "./services/offlineSOS.js";
+import "leaflet/dist/leaflet.css";
+import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
 
 const router = createBrowserRouter([
   {

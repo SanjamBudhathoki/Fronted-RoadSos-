@@ -15,6 +15,7 @@ const severityColors = {
   CRITICAL: 'bg-red-50 text-red-700 border-red-200',
 };
 
+
 const ProviderDashboard = () => {
   const [nearbySos, setNearbySos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -252,26 +253,46 @@ const ProviderDashboard = () => {
     }
   };
 
-  const handleAcceptSos = async (id) => {
-    try {
-      const response = await sosService.acceptSos(id);
-      const mission = response?.data;
-      setActiveMission(mission);
-      setMissionStartTime(mission.acceptedAt ? new Date(mission.acceptedAt).getTime() : Date.now());
-      setNearbySos((prev) => prev.filter((item) => item._id !== id));
-      
-      if (currentLocation) {
-        socket.emit("provider:location-update", {
-          sosId: mission._id,
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude,
-        });
-      }
-    } catch (err) {
-      console.error(err);
-      setError('Failed to accept SOS.');
+const handleAcceptSos = async (id) => {
+  try {
+    const response = await sosService.acceptSos(id);
+    const mission = response?.data;
+
+    // Get original SOS details before removing it
+    const sos = nearbySos.find((item) => item._id === id);
+
+    // Merge missing fields from SOS into mission
+    const fullMission = {
+      ...mission,
+      location: sos?.location ?? mission.location,
+      driverId: sos?.driverId ?? mission.driverId,
+      emergencyType: sos?.emergencyType ?? mission.emergencyType,
+    };
+
+    setActiveMission(fullMission);
+
+    setMissionStartTime(
+      fullMission.acceptedAt
+        ? new Date(fullMission.acceptedAt).getTime()
+        : Date.now()
+    );
+
+    setNearbySos((prev) =>
+      prev.filter((item) => item._id !== id)
+    );
+
+    if (currentLocation) {
+      socket.emit("provider:location-update", {
+        sosId: fullMission._id,
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+      });
     }
-  };
+  } catch (err) {
+    console.error(err);
+    setError("Failed to accept SOS.");
+  }
+};
 
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -280,12 +301,14 @@ const ProviderDashboard = () => {
   };
 
   const handleNavigate = () => {
-    if (!activeMission?.location?.coordinates) {
+    const coords = activeMission?.location?.coordinates;
+    if (!coords || !Array.isArray(coords) || coords.length !== 2) {
       setError("Location not available.");
       return;
     }
-    const [lng, lat] = activeMission.location.coordinates;
+    const [lng, lat] = coords;
     const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    console.log("Opening Google Maps URL:", url);
     window.open(url, "_blank", "noopener,noreferrer");
   };
 

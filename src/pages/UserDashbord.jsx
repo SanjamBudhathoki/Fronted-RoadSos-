@@ -1,20 +1,31 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import Card from '../components/Card';
-import Button from '../components/Button';
-import Loader from '../components/Loader';
-import { sosService } from '../services/sosService';
-import { aiService } from '../services/aiService';
-import { AlertTriangle, Mic, Camera, Upload, Image as ImageIcon } from 'lucide-react';
-import socket from '../services/socket';
-import { calculateDistance } from '../services/distanceCalculator';
-import LiveTrackingMaps from '../components/LiveTrackingMaps';
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import Card from "../components/Card";
+import Button from "../components/Button";
+import Loader from "../components/Loader";
+import { sosService } from "../services/sosService";
+import { aiService } from "../services/aiService";
+import {
+  AlertTriangle,
+  Mic,
+  Camera,
+  Upload,
+  ImageIcon,
+  X,
+  CheckCircle2,
+  MapPin,
+  Clock,
+  Activity,
+} from "lucide-react";
+import socket from "../services/socket";
+import { calculateDistance } from "../services/distanceCalculator";
+import LiveTrackingMaps from "../components/LiveTrackingMaps";
 
 const UserDashboard = () => {
   const [mySosList, setMySosList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [analysis, setAnalysis] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -23,13 +34,13 @@ const UserDashboard = () => {
   const [online, setOnline] = useState(navigator.onLine);
   const [pendingEmergencyData, setPendingEmergencyData] = useState(null);
   
-  const recognitionRef = useRef(null);
+const [voiceLoading, setVoiceLoading] = useState(false);
+const recognitionRef = useRef(null);
   const successTimeoutRef = useRef(null);
 
-  // Auto-clear success messages
   useEffect(() => {
     if (success) {
-      successTimeoutRef.current = setTimeout(() => setSuccess(''), 5000);
+      successTimeoutRef.current = setTimeout(() => setSuccess(""), 5000);
     }
     return () => {
       if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
@@ -49,36 +60,39 @@ const UserDashboard = () => {
   };
 
   const activeSos = useMemo(() => {
-    const activeStatuses = new Set(["PENDING", "ACCEPTED", "ON_THE_WAY", "ARRIVED"]);
+    const activeStatuses = new Set([
+      "PENDING",
+      "ACCEPTED",
+      "ON_THE_WAY",
+      "ARRIVED",
+    ]);
     return mySosList.find((s) => activeStatuses.has(s.status)) || null;
   }, [mySosList]);
 
   const hasActiveSos = !!activeSos;
   const activeSosId = activeSos?._id;
 
-  //  PROBLEM 4 FIXED: AI analysis with real data
   const analyzeEmergency = async (emergencyData = null) => {
     try {
       const data = emergencyData || {
         emergencyType: "GENERAL",
-        description: "Emergency assistance needed"
+        description: "Emergency assistance needed",
       };
-      
       const result = await aiService.analyzeEmergency(data);
       setAnalysis(result.data);
       return result.data;
     } catch (error) {
-      console.error('Emergency analysis failed:', error);
+      console.error("Emergency analysis failed:", error);
       return null;
     }
   };
 
-  //  PROBLEM 4 FIXED: Auto-analyze active emergency with real data
   useEffect(() => {
     if (activeSos?.notes) {
       analyzeEmergency({
         emergencyType: activeSos.emergencyType || "GENERAL",
-        description: activeSos.notes || `Emergency: ${activeSos.emergencyType}`
+        description:
+          activeSos.notes || `Emergency: ${activeSos.emergencyType}`,
       });
     }
   }, [activeSos?._id]);
@@ -87,19 +101,15 @@ const UserDashboard = () => {
     fetchMySos();
   }, []);
 
-  // Listen for SOS status updates
   useEffect(() => {
     const handleStatusUpdate = ({ sosId, status }) => {
-      console.log("📊 Status update received:", { sosId, status });
       setMySosList((prev) =>
-        prev.map((item) =>
-          item._id === sosId ? { ...item, status } : item
-        )
+        prev.map((item) => (item._id === sosId ? { ...item, status } : item))
       );
     };
 
     const handleArrival = () => {
-      setSuccess("🚑 Provider has arrived at your location!");
+      setSuccess("Provider has arrived at your location!");
     };
 
     socket.on("sos:statusUpdated", handleStatusUpdate);
@@ -111,53 +121,32 @@ const UserDashboard = () => {
     };
   }, []);
 
-  // Clear provider location when active SOS changes
   useEffect(() => {
     setProviderLocation(null);
   }, [activeSosId]);
 
-  // Listen for provider location updates
   useEffect(() => {
     const handleLocationUpdate = (data) => {
-      console.log("📍 Received provider location:", data);
-      
-      if (!activeSosId) {
-        console.warn(" No active SOS ID, ignoring location update");
-        return;
-      }
-      
-      if (String(data.sosId) !== String(activeSosId)) {
-        console.warn(" SOS ID mismatch:", {
-          received: data.sosId,
-          current: activeSosId
-        });
-        return;
-      }
+      if (!activeSosId) return;
+      if (String(data.sosId) !== String(activeSosId)) return;
 
       const lat = Number(data.latitude);
       const lng = Number(data.longitude);
 
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        console.warn(" Invalid coordinates:", { lat, lng });
-        return;
-      }
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
-      console.log(" Setting provider location:", [lat, lng]);
       setProviderLocation([lat, lng]);
     };
 
-    console.log(" Listening for provider location updates...");
     socket.on("provider:location-update", handleLocationUpdate);
     socket.on("provider:location-updated", handleLocationUpdate);
 
     return () => {
-      console.log("Stopped listening for provider location updates");
       socket.off("provider:location-update", handleLocationUpdate);
       socket.off("provider:location-updated", handleLocationUpdate);
     };
   }, [activeSosId]);
 
-  // Online/Offline detection
   useEffect(() => {
     const onOnline = () => setOnline(true);
     const onOffline = () => setOnline(false);
@@ -169,97 +158,104 @@ const UserDashboard = () => {
     };
   }, []);
 
-  // Cleanup speech recognition
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
         recognitionRef.current = null;
-      }
+      };
     };
   }, []);
 
-  // SOS with real data and image attachment
   const handleTriggerSos = async (emergencyData = {}) => {
     if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser.');
+      setError("Geolocation is not supported by your browser.");
       return;
     }
 
     setActionLoading(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
-    // Get real description from user if not provided
-    const userDescription = emergencyData.notes || window.prompt(
-      'Briefly describe your emergency (optional):', 
-      ''
-    ) || 'Emergency assistance needed';
+    const userDescription =
+      emergencyData.notes ||
+      window.prompt("Briefly describe your emergency (optional):", "") ||
+      "Emergency assistance needed";
 
-    navigator.geolocation.getCurrentPosition(async (position) => {
-      try {
-        //  Merge pending image/AI data with SOS payload
-        const payload = {
-          emergencyType: emergencyData.emergencyType || pendingEmergencyData?.aiAnalysisResult?.recommendedServices?.[0] || "GENERAL",
-          coordinates: [
-            position.coords.longitude,
-            position.coords.latitude
-          ],
-          notes: userDescription,
-          // Include image and AI analysis
-          imageUrl: emergencyData.imageUrl || pendingEmergencyData?.imageUrl || null,
-          imageFilename: emergencyData.imageFilename || pendingEmergencyData?.imageFilename || null,
-          aiAnalysisResult: emergencyData.aiAnalysisResult || pendingEmergencyData?.aiAnalysisResult || null,
-        };
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const payload = {
+            emergencyType:
+              emergencyData.emergencyType ||
+              pendingEmergencyData?.aiAnalysisResult?.recommendedServices?.[0] ||
+              "GENERAL",
+            coordinates: [position.coords.longitude, position.coords.latitude],
+            notes: userDescription,
+            imageUrl:
+              emergencyData.imageUrl || pendingEmergencyData?.imageUrl || null,
+            imageFilename:
+              emergencyData.imageFilename ||
+              pendingEmergencyData?.imageFilename ||
+              null,
+            aiAnalysisResult:
+              emergencyData.aiAnalysisResult ||
+              pendingEmergencyData?.aiAnalysisResult ||
+              null,
+          };
 
-        await sosService.createSos(payload);
-        setSuccess('🚨 SOS triggered successfully! Help is on the way.');
-        
-        //  Analyze with real data
-        analyzeEmergency({
-          emergencyType: payload.emergencyType,
-          description: payload.notes
-        });
-        
-        //  Show analysis if available
-        if (payload.aiAnalysisResult) {
-          setAnalysis(payload.aiAnalysisResult);
+          await sosService.createSos(payload);
+          setSuccess("SOS triggered successfully! Help is on the way.");
+
+          analyzeEmergency({
+            emergencyType: payload.emergencyType,
+            description: payload.notes,
+          });
+
+          if (payload.aiAnalysisResult) {
+            setAnalysis(payload.aiAnalysisResult);
+          }
+
+          setPendingEmergencyData(null);
+          setSelectedImage(null);
+          setImagePreview(null);
+
+          await fetchMySos();
+        } catch (err) {
+          setError("Failed to trigger SOS. Please try again.");
+        } finally {
+          setActionLoading(false);
         }
-        
-        //  Clean up
-        setPendingEmergencyData(null);
-        setSelectedImage(null);
-        setImagePreview(null);
-        
-        await fetchMySos();
-      } catch (err) {
-        setError('Failed to trigger SOS. Please try again.');
-      } finally {
+      },
+      () => {
+        setError(
+          "Unable to retrieve your location. Please enable location services."
+        );
         setActionLoading(false);
       }
-    }, () => {
-      setError('Unable to retrieve your location. Please enable location services.');
-      setActionLoading(false);
-    });
+    );
   };
 
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
-    // Validate file size (max 10MB)
+
     if (file.size > 10 * 1024 * 1024) {
       setError("Image size should be less than 10MB");
       return;
     }
-    
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+    ];
     if (!allowedTypes.includes(file.type)) {
       setError("Please upload a valid image (JPEG, PNG, WebP, or GIF)");
       return;
     }
-    
+
     setSelectedImage(file);
     setImagePreview(URL.createObjectURL(file));
   };
@@ -272,16 +268,14 @@ const UserDashboard = () => {
 
     try {
       setImageLoading(true);
-      setError('');
-      setSuccess('');
+      setError("");
+      setSuccess("");
 
       const result = await aiService.analyzeImage(selectedImage);
       const analysisData = result.data;
-      
-      // Show analysis
+
       setAnalysis(analysisData);
-      
-      //  Store for SOS creation
+
       setPendingEmergencyData({
         imageUrl: analysisData.imageUrl,
         imageFilename: analysisData.imageFilename,
@@ -294,8 +288,10 @@ const UserDashboard = () => {
           confidence: 0.9,
         },
       });
-      
-      setSuccess(" Image analyzed! Click 'Trigger SOS Now' to create emergency with photo evidence.");
+
+      setSuccess(
+        "Image analyzed! Click 'Trigger SOS Now' to create emergency with photo evidence."
+      );
     } catch (err) {
       console.error(err);
       setError("Failed to analyze image. Please try again.");
@@ -304,102 +300,91 @@ const UserDashboard = () => {
     }
   };
 
-  const handleVoiceSos = async () => {
+const handleVoiceSos = () => {
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    alert("Speech recognition not supported in this browser.");
+    return;
+  }
+
+  // Prevent starting a new recognition if one is already active
+  if (recognitionRef.current) {
+    recognitionRef.current.abort();
+  }
+
+  const recognition = new SpeechRecognition();
+  recognitionRef.current = recognition;
+
+  recognition.lang = "en-US";
+  recognition.continuous = false;
+  recognition.interimResults = false;       // ← only final transcript
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => {
+    setVoiceLoading(true);
+    setError("");
+  };
+
+  recognition.onresult = async (event) => {
     try {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const result = event.results[0];
+      if (!result.isFinal) return;          // safety guard
 
-      if (!SpeechRecognition) {
-        setError("Speech recognition is not supported in this browser.");
-        return;
-      }
+      const transcript = result[0].transcript.trim();
+      if (!transcript) return;
 
-      const recognition = new SpeechRecognition();
-      recognitionRef.current = recognition;
-      recognition.lang = "en-US";
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
+      console.log("FINAL TRANSCRIPT:", transcript);
 
-      recognition.onresult = async (event) => {
-        recognition.stop();
-        try {
-          const transcript = event.results[0][0].transcript;
-          const result = await aiService.voiceSos({ transcript });
-          const voiceData = result.data;
+      const response = await aiService.voiceSos({ transcript });
+      console.log("BACKEND RESPONSE:", response);
 
-          console.log("🎤 Voice analysis result:", voiceData);
+      // Optional: handle the response (show analysis, trigger SOS etc.)
+      // e.g. if response.data.emergencyDetected then auto‑trigger SOS
 
-          if (voiceData.severity === "HIGH" || voiceData.severity === "CRITICAL") {
-            if (hasActiveSos) {
-              setSuccess(`Voice captured: "${transcript}" — you already have an active emergency.`);
-            } else {
-              navigator.geolocation.getCurrentPosition(async (position) => {
-                await sosService.createSos({
-                  emergencyType: voiceData.incidentType || "GENERAL",
-                  coordinates: [position.coords.longitude, position.coords.latitude],
-                  notes: transcript,
-                  aiAnalysisResult: {
-                    severity: voiceData.severity,
-                    priorityScore: voiceData.priorityScore,
-                    recommendedServices: voiceData.recommendedServices || [],
-                    reason: voiceData.reason,
-                    safetyInstructions: voiceData.safetyInstructions,
-                    confidence: 0.9,
-                  },
-                });
-                fetchMySos();
-                setSuccess("🚨 Emergency detected from voice! SOS created automatically.");
-              });
-            }
-          } else {
-            setSuccess(`Voice captured: "${transcript}". Severity: ${voiceData.severity || 'LOW'}`);
-          }
-
-          // Show full analysis
-          setAnalysis({
-            severity: voiceData.severity,
-            priorityScore: voiceData.priorityScore,
-            reason: voiceData.reason,
-            summary: voiceData.summary,
-            recommendedServices: voiceData.recommendedServices,
-            safetyInstructions: voiceData.safetyInstructions,
-            injuredCount: voiceData.injuredCount,
-            medicalRequired: voiceData.medicalRequired,
-          });
-        } catch (err) {
-          console.error(err);
-          setError("Voice analysis failed.");
-        } finally {
-          recognitionRef.current = null;
-        }
-      };
-
-      recognition.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
-        setError(`Voice recognition failed: ${event.error}`);
-        recognitionRef.current = null;
-      };
-
-      recognition.onend = () => {
-        console.log("Speech recognition ended");
-      };
-
-      recognition.start();
-    } catch (err) {
-      console.error(err);
-      setError("Unable to start voice recognition.");
+    } catch (error) {
+      console.error("VOICE API ERROR:", error);
+      setError("Voice analysis failed. Please try again.");
+    } finally {
+      setVoiceLoading(false);
+      recognitionRef.current = null;
     }
   };
 
+  recognition.onerror = (event) => {
+    console.error("RECOGNITION ERROR:", event.error);
+    setError(`Voice error: ${event.error}`);
+    setVoiceLoading(false);
+    recognitionRef.current = null;
+  };
+
+  recognition.onend = () => {
+    setVoiceLoading(false);
+    recognitionRef.current = null;
+  };
+
+  recognition.start();
+};
+
+// Cleanup on unmount
+useEffect(() => {
+  return () => {
+    recognitionRef.current?.abort();
+  };
+}, []);
+
+
   const handleCancelSOS = async (id) => {
     try {
-      setError('');
-      setSuccess('');
+      setError("");
+      setSuccess("");
       await sosService.cancelSos(id);
-      setSuccess('SOS request cancelled successfully.');
+      setSuccess("SOS request cancelled successfully.");
       fetchMySos();
     } catch (err) {
       console.error(err);
-      setError('Failed to cancel SOS.');
+      setError("Failed to cancel SOS.");
     }
   };
 
@@ -410,43 +395,52 @@ const UserDashboard = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
       {activeSos && (
-        <div className="mb-4 p-3 bg-gray-50 border border-gray-300 rounded-lg text-xs font-mono">
-          <p className="font-bold text-sm mb-2">🔍 Debug:</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <p className="text-gray-500">SOS ID:</p>
-              <p className="font-semibold">{activeSos._id?.slice(-8)}</p>
-            </div>
-            <div>
-              <p className="text-gray-500">Status:</p>
-              <p className="font-semibold">{activeSos.status}</p>
-            </div>
-            <div>
-              <p className="text-gray-500">Socket:</p>
-              <p className={`font-semibold ${socket.connected ? 'text-green-600' : 'text-red-600'}`}>
-                {socket.connected ? ' Connected' : '❌ Disconnected'}
+        <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono">
+          <div className="flex items-center justify-between mb-3">
+            <p className="font-bold text-sm text-gray-700">Debug Info</p>
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                socket.connected
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-red-100 text-red-700"
+              }`}
+            >
+              {socket.connected ? "Connected" : "Disconnected"}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="bg-white p-2 rounded-lg">
+              <p className="text-gray-400">SOS ID</p>
+              <p className="font-semibold text-gray-900">
+                {activeSos._id?.slice(-8)}
               </p>
             </div>
-            <div>
-              <p className="text-gray-500">Provider:</p>
-              <p className={`font-semibold ${providerLocation ? 'text-green-600' : 'text-red-600'}`}>
-                {providerLocation ? ' Received' : '⏳ Waiting'}
+            <div className="bg-white p-2 rounded-lg">
+              <p className="text-gray-400">Status</p>
+              <p className="font-semibold text-gray-900">{activeSos.status}</p>
+            </div>
+            <div className="bg-white p-2 rounded-lg">
+              <p className="text-gray-400">Provider Loc</p>
+              <p
+                className={`font-semibold ${providerLocation ? "text-emerald-600" : "text-red-500"}`}
+              >
+                {providerLocation ? "Received" : "Waiting"}
               </p>
             </div>
-            <div>
-              <p className="text-gray-500">User Loc:</p>
-              <p className="font-semibold">
-                {activeSos?.location?.coordinates 
+            <div className="bg-white p-2 rounded-lg">
+              <p className="text-gray-400">User Loc</p>
+              <p className="font-semibold text-gray-900">
+                {activeSos?.location?.coordinates
                   ? `${activeSos.location.coordinates[1]?.toFixed(4)}, ${activeSos.location.coordinates[0]?.toFixed(4)}`
-                  : '❌'}
+                  : "N/A"}
               </p>
             </div>
-            <div>
-              <p className="text-gray-500">Provider Loc:</p>
-              <p className="font-semibold">
-                {providerLocation 
+            <div className="bg-white p-2 rounded-lg">
+              <p className="text-gray-400">Provider Coords</p>
+              <p className="font-semibold text-gray-900">
+                {providerLocation
                   ? `${providerLocation[0]?.toFixed(4)}, ${providerLocation[1]?.toFixed(4)}`
-                  : '❌'}
+                  : "N/A"}
               </p>
             </div>
           </div>
@@ -454,309 +448,527 @@ const UserDashboard = () => {
       )}
 
       {!online && (
-        <div className="bg-red-500 text-white p-3 rounded mb-4">
-          ⚠ Offline Mode Active. Emergency requests will be stored and sent automatically.
+        <div className="mb-4 p-4 bg-red-500 text-white rounded-xl flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 shrink-0" />
+          <p className="text-sm font-medium">
+            Offline Mode Active. Emergency requests will be stored and sent
+            automatically.
+          </p>
         </div>
       )}
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">User Dashboard</h1>
-      
-      {error && <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
-      {success && <div className="mb-4 p-3 bg-green-50 text-green-600 rounded-lg text-sm">{success}</div>}
+      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">
+        User Dashboard
+      </h1>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-red-800">Error</p>
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+          <button
+            onClick={() => setError("")}
+            className="text-red-400 hover:text-red-600 shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      {success && (
+        <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3">
+          <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-emerald-800">Success</p>
+            <p className="text-sm text-emerald-600">{success}</p>
+          </div>
+          <button
+            onClick={() => setSuccess("")}
+            className="text-emerald-400 hover:text-emerald-600 shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <Card className="flex flex-col items-center justify-center text-center p-8 border-red-200 bg-red-50">
-          <AlertTriangle className="h-16 w-16 text-red-500 mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Emergency?</h2>
-          <p className="text-gray-600 mb-6 text-sm">Tap the button below to instantly broadcast your location to nearby providers.</p>
-          <Button
-            variant="danger"
-            className="w-full text-lg py-4 uppercase tracking-widest"
-            onClick={() => handleTriggerSos(pendingEmergencyData || {})}
-            disabled={actionLoading || hasActiveSos}
-          >
-            {actionLoading ? (
-              "Broadcasting..."
-            ) : hasActiveSos ? (
-              "Emergency Active"
-            ) : pendingEmergencyData ? (
-              "📸 Send SOS with Photo Evidence"
-            ) : (
-              "Trigger SOS Now"
-            )}
-          </Button>
-          
-          {/*  Show pending evidence indicator */}
-          {pendingEmergencyData && (
-            <div className="mt-3 flex items-center gap-2 text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-full">
-              <ImageIcon className="h-3 w-3" />
-              Photo evidence ready - will be included with SOS
+        <Card className="border-red-200 bg-red-50/50 overflow-hidden">
+          <div className="p-6 sm:p-8 flex flex-col items-center text-center">
+            <div className="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center mb-5">
+              <AlertTriangle className="h-10 w-10 text-red-600" />
             </div>
-          )}
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              Emergency?
+            </h2>
+            <p className="text-gray-600 mb-6 text-sm max-w-xs">
+              Tap the button below to instantly broadcast your location to
+              nearby providers.
+            </p>
+            <Button
+              variant="danger"
+              className="w-full text-lg py-4 uppercase tracking-widest rounded-xl font-bold"
+              onClick={() =>
+                handleTriggerSos(pendingEmergencyData || {})
+              }
+              disabled={actionLoading || hasActiveSos}
+            >
+              {actionLoading
+                ? "Broadcasting..."
+                : hasActiveSos
+                  ? "Emergency Active"
+                  : pendingEmergencyData
+                    ? "Send SOS with Photo Evidence"
+                    : "Trigger SOS Now"}
+            </Button>
+
+            {pendingEmergencyData && (
+              <div className="mt-4 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-200">
+                <ImageIcon className="h-3.5 w-3.5" />
+                Photo evidence ready - will be included with SOS
+              </div>
+            )}
+          </div>
         </Card>
 
         <div className="space-y-6">
-          <Card>
-            <h3 className="font-semibold text-gray-800 flex items-center gap-2 mb-4">
-              <Mic className="h-5 w-5 text-blue-500" /> AI Voice Analysis
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">Describe your emergency using voice. High/Critical emergencies auto-trigger SOS.</p>
-            <Button variant="secondary" className="w-full" onClick={handleVoiceSos}>
-              Start Recording
-            </Button>
-          </Card>
-          
           <Card className="overflow-hidden">
-            <h3 className="font-semibold text-gray-800 flex items-center gap-2 mb-2">
-              <Camera className="h-5 w-5 text-green-500" /> AI Image Analysis
-            </h3>
-            <p className="text-sm text-gray-500 mb-5">
-              Upload a vehicle, accident, or roadside issue photo for AI assessment.
-            </p>
-            <div className="space-y-4">
-              <div className="border-2 border-dashed border-gray-300 hover:border-green-500 transition-all duration-300 rounded-2xl bg-gray-50 p-6">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
-                    <Camera className="h-8 w-8 text-green-600" />
-                  </div>
-                  <h4 className="font-semibold text-gray-800">Upload Emergency Photo</h4>
-                  <p className="text-sm text-gray-500 mt-1 mb-5">
-                    Take a photo instantly or upload from your gallery
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Mic className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">
+                    AI Voice Analysis
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    High/Critical emergencies auto-trigger SOS
                   </p>
-                  <div className="flex flex-wrap justify-center gap-3">
-                    <label className="cursor-pointer">
-                      <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
-                      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700 transition">
-                        <Upload size={18} /> Gallery
-                      </div>
-                    </label>
-                    <label className="cursor-pointer">
-                      <input type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
-                      <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-green-600 text-green-600 hover:bg-green-50 transition">
-                        <Camera size={18} /> Camera
-                      </div>
-                    </label>
-                  </div>
                 </div>
               </div>
-              {imagePreview && (
-                <div className="relative">
-                  <img src={imagePreview} alt="Emergency Preview" className="w-full h-56 object-cover rounded-2xl shadow-md border" />
-                  <div className="absolute top-3 right-3 bg-black/70 text-white px-3 py-1 rounded-full text-xs">
-                    Ready for Analysis
+              <p className="text-sm text-gray-600 mb-4">
+                Describe your emergency using voice for instant AI assessment.
+              </p>
+<Button
+  variant="secondary"
+  className="w-full rounded-xl"
+  onClick={handleVoiceSos}
+  disabled={voiceLoading}
+>
+  {voiceLoading ? (
+    <Loader className="h-4 w-4 animate-spin mr-2" />
+  ) : (
+    <Mic className="w-4 h-4 mr-2" />
+  )}
+  {voiceLoading ? "Listening…" : "Start Recording"}
+</Button>
+            </div>
+          </Card>
+
+          <Card className="overflow-hidden">
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                  <Camera className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">
+                    AI Image Analysis
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Upload accident or roadside photos
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="border-2 border-dashed border-gray-200 hover:border-emerald-400 transition-all duration-300 rounded-2xl bg-gray-50 p-6">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mb-3">
+                      <Camera className="h-7 w-7 text-emerald-600" />
+                    </div>
+                    <h4 className="font-semibold text-gray-800 text-sm">
+                      Upload Emergency Photo
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-1 mb-4">
+                      Take a photo or upload from gallery
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageSelect}
+                          className="hidden"
+                        />
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition text-sm font-medium">
+                          <Upload size={16} /> Gallery
+                        </div>
+                      </label>
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={handleImageSelect}
+                          className="hidden"
+                        />
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-600 text-emerald-600 hover:bg-emerald-50 transition text-sm font-medium">
+                          <Camera size={16} /> Camera
+                        </div>
+                      </label>
+                    </div>
                   </div>
                 </div>
-              )}
-              <Button
-                variant="secondary"
-                className="w-full py-3 text-base font-semibold"
-                onClick={handleImageAnalysis}
-                disabled={!selectedImage || imageLoading}
-              >
-                {imageLoading ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader className="h-4 w-4 animate-spin" /> Analyzing Emergency...
+
+                {imagePreview && (
+                  <div className="relative rounded-xl overflow-hidden">
+                    <img
+                      src={imagePreview}
+                      alt="Emergency Preview"
+                      className="w-full h-48 object-cover"
+                    />
+                    <div className="absolute top-3 right-3 bg-black/70 text-white px-3 py-1 rounded-full text-xs font-medium">
+                      Ready for Analysis
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedImage(null);
+                        setImagePreview(null);
+                      }}
+                      className="absolute top-3 left-3 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                ) : (
-                  "Analyze Emergency Image"
                 )}
-              </Button>
+
+                <Button
+                  variant="secondary"
+                  className="w-full py-3 text-sm font-semibold rounded-xl"
+                  onClick={handleImageAnalysis}
+                  disabled={!selectedImage || imageLoading}
+                >
+                  {imageLoading ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader className="h-4 w-4 animate-spin" />
+                      Analyzing Emergency...
+                    </div>
+                  ) : (
+                    "Analyze Emergency Image"
+                  )}
+                </Button>
+              </div>
             </div>
           </Card>
         </div>
       </div>
-      
+
       {activeSos && (
-        <Card className="mb-6 border-red-300 bg-red-50 md:col-span-2">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="font-bold text-red-700 text-lg">Active Emergency</h2>
-              <p className="mt-2">
-                Status: <span className="font-semibold ml-2">{activeSos.status}</span>
-              </p>
-              <p className="text-sm text-gray-600">
-                {new Date(activeSos.createdAt).toLocaleString()}
-              </p>
+        <Card className="mb-6 border-red-200 bg-red-50/50">
+          <div className="p-5">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="font-bold text-red-700 text-lg flex items-center gap-2">
+                  <Activity className="w-5 h-5" />
+                  Active Emergency
+                </h2>
+                <p className="mt-1 text-gray-600">
+                  Status:{" "}
+                  <span className="font-semibold text-gray-900 ml-1">
+                    {activeSos.status}
+                  </span>
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {new Date(activeSos.createdAt).toLocaleString()}
+                </p>
+              </div>
+              {["PENDING", "ACCEPTED", "ON_THE_WAY"].includes(
+                activeSos?.status
+              ) && (
+                <Button
+                  variant="secondary"
+                  onClick={() => handleCancelSOS(activeSos._id)}
+                  className="rounded-xl"
+                >
+                  Cancel SOS
+                </Button>
+              )}
             </div>
-            {["PENDING", "ACCEPTED", "ON_THE_WAY"].includes(activeSos?.status) && (
-              <Button variant="secondary" onClick={() => handleCancelSOS(activeSos._id)}>
-                Cancel SOS
-              </Button>
+            <div className="flex flex-wrap gap-2 mt-5">
+              {steps.map((step) => (
+                <div
+                  key={step}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                    activeSos.status === step
+                      ? "bg-emerald-500 text-white shadow-sm"
+                      : "bg-gray-100 text-gray-500"
+                  }`}
+                >
+                  {step.replace("_", " ")}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {activeSos && (
+        <Card className="mb-6 overflow-hidden">
+          <div className="p-5">
+            <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-red-500" />
+              Live Rescue Tracking
+            </h2>
+            {activeSos?.location?.coordinates?.length >= 2 ? (
+              <div className="rounded-xl overflow-hidden -mx-5 -mb-5">
+                <LiveTrackingMaps
+                  userLocation={[
+                    activeSos.location.coordinates[1],
+                    activeSos.location.coordinates[0],
+                  ]}
+                  providerLocation={providerLocation}
+                />
+              </div>
+            ) : (
+              <p className="text-gray-500 text-center py-8">
+                Location data not available
+              </p>
             )}
           </div>
-          <div className="flex flex-wrap gap-2 mt-5">
-            {steps.map(step => (
-              <div
-                key={step}
-                className={`px-3 py-1 rounded-full text-sm ${
-                  activeSos.status === step
-                    ? "bg-green-500 text-white"
-                    : "bg-gray-200 text-gray-600"
-                }`}
-              >
-                {step}
-              </div>
-            ))}
-          </div>
         </Card>
       )}
 
-      {/* Maps */}
-      {activeSos && (
-        <Card className="mb-6">
-          <h2 className="font-bold text-lg mb-4">Live Rescue Tracking</h2>
-          {activeSos?.location?.coordinates?.length >= 2 ? (
-            <LiveTrackingMaps
-              userLocation={[
-                activeSos.location.coordinates[1],
-                activeSos.location.coordinates[0],
-              ]}
-              providerLocation={providerLocation}
-            />
-          ) : (
-            <p className="text-gray-500 text-center py-4">Location data not available</p>
-          )}
-        </Card>
-      )}
-
-      {/* Live ETA */}
       {providerLocation && activeSos?.location?.coordinates?.length >= 2 && (
-        <Card className="mt-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center p-4 bg-green-50 rounded-xl">
-              <p className="text-sm text-gray-500">Distance</p>
-              <p className="text-2xl font-bold text-green-600">
-                {calculateDistance(
-                  providerLocation[0],
-                  providerLocation[1],
-                  activeSos.location.coordinates[1],
-                  activeSos.location.coordinates[0]
-                ).toFixed(2)} km
-              </p>
-            </div>
-            <div className="text-center p-4 bg-blue-50 rounded-xl">
-              <p className="text-sm text-gray-500">ETA</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {Math.ceil(
-                  calculateDistance(
+        <Card className="mb-6">
+          <div className="p-5">
+            <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-blue-500" />
+              Estimated Arrival
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-4 bg-emerald-50 rounded-xl">
+                <p className="text-xs text-gray-500 mb-1">Distance</p>
+                <p className="text-2xl font-bold text-emerald-600">
+                  {calculateDistance(
                     providerLocation[0],
                     providerLocation[1],
                     activeSos.location.coordinates[1],
                     activeSos.location.coordinates[0]
-                  ) / 0.6
-                )} mins
-              </p>
+                  ).toFixed(2)}{" "}
+                  <span className="text-sm font-normal">km</span>
+                </p>
+              </div>
+              <div className="text-center p-4 bg-blue-50 rounded-xl">
+                <p className="text-xs text-gray-500 mb-1">ETA</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {Math.ceil(
+                    calculateDistance(
+                      providerLocation[0],
+                      providerLocation[1],
+                      activeSos.location.coordinates[1],
+                      activeSos.location.coordinates[0]
+                    ) / 0.6
+                  )}{" "}
+                  <span className="text-sm font-normal">mins</span>
+                </p>
+              </div>
             </div>
           </div>
         </Card>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card>
-          <h3 className="text-2xl font-bold">{mySosList.length}</h3>
-          <p className="text-gray-500 text-sm">Total Requests</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <Card className="text-center">
+          <div className="p-5">
+            <h3 className="text-3xl font-bold text-gray-900">
+              {mySosList.length}
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">Total Requests</p>
+          </div>
         </Card>
-        <Card>
-          <h3 className="text-2xl font-bold">
-            {mySosList.filter(s => s.status !== "COMPLETED" && s.status !== "CANCELLED").length}
-          </h3>
-          <p className="text-gray-500 text-sm">Active Requests</p>
+        <Card className="text-center">
+          <div className="p-5">
+            <h3 className="text-3xl font-bold text-blue-600">
+              {
+                mySosList.filter(
+                  (s) => s.status !== "COMPLETED" && s.status !== "CANCELLED"
+                ).length
+              }
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">Active Requests</p>
+          </div>
         </Card>
-        <Card>
-          <h3 className="text-2xl font-bold">
-            {mySosList.filter(s => s.status === "COMPLETED").length}
-          </h3>
-          <p className="text-gray-500 text-sm">Resolved</p>
+        <Card className="text-center">
+          <div className="p-5">
+            <h3 className="text-3xl font-bold text-emerald-600">
+              {mySosList.filter((s) => s.status === "COMPLETED").length}
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">Resolved</p>
+          </div>
         </Card>
       </div>
 
-      {/* AI Analysis */}
       {analysis && (
-        <Card className="mb-6 border-indigo-200 bg-linear-to-r from-indigo-50 to-white">
-          <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-indigo-600" />
-            AI Emergency Assessment
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <strong>Severity:</strong>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                analysis.severity === 'CRITICAL' ? 'bg-red-100 text-red-700' :
-                analysis.severity === 'HIGH' ? 'bg-orange-100 text-orange-700' :
-                analysis.severity === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' :
-                'bg-green-100 text-green-700'
-              }`}>
-                {analysis.severity}
-              </span>
-            </div>
-            <div><strong>Priority Score:</strong> {analysis.priorityScore}/100</div>
-            {analysis.reason && <div><strong>Analysis:</strong> {analysis.reason}</div>}
-            {analysis.summary && <div><strong>Summary:</strong> {analysis.summary}</div>}
-            {analysis.injuredCount > 0 && <div><strong>Injured:</strong> {analysis.injuredCount} person(s)</div>}
-            {analysis.safetyInstructions && (
-              <div className="bg-white p-3 rounded-lg border border-indigo-100">
-                <strong> Safety Instructions:</strong>
-                <p className="text-sm mt-1">{analysis.safetyInstructions}</p>
+        <Card className="mb-6 border-indigo-200 bg-indigo-50/50">
+          <div className="p-5">
+            <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-indigo-900">
+              <AlertTriangle className="h-5 w-5 text-indigo-600" />
+              AI Emergency Assessment
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-600">
+                  Severity:
+                </span>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                    analysis.severity === "CRITICAL"
+                      ? "bg-red-100 text-red-700"
+                      : analysis.severity === "HIGH"
+                        ? "bg-orange-100 text-orange-700"
+                        : analysis.severity === "MEDIUM"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-green-100 text-green-700"
+                  }`}
+                >
+                  {analysis.severity}
+                </span>
               </div>
-            )}
-            {analysis.recommendedServices && analysis.recommendedServices.length > 0 && (
-              <div>
-                <strong>Recommended Services:</strong>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {analysis.recommendedServices.map((service, index) => (
-                    <span key={index} className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium">
-                      {service}
-                    </span>
-                  ))}
+              <div className="text-sm text-gray-600">
+                <span className="font-medium">Priority Score:</span>{" "}
+                {analysis.priorityScore}/100
+              </div>
+              {analysis.reason && (
+                <div className="text-sm text-gray-600">
+                  <span className="font-medium">Analysis:</span>{" "}
+                  {analysis.reason}
                 </div>
-              </div>
-            )}
+              )}
+              {analysis.summary && (
+                <div className="text-sm text-gray-600">
+                  <span className="font-medium">Summary:</span>{" "}
+                  {analysis.summary}
+                </div>
+              )}
+              {analysis.injuredCount > 0 && (
+                <div className="text-sm text-gray-600">
+                  <span className="font-medium">Injured:</span>{" "}
+                  {analysis.injuredCount} person(s)
+                </div>
+              )}
+              {analysis.safetyInstructions && (
+                <div className="bg-white p-4 rounded-xl border border-indigo-100">
+                  <span className="text-sm font-medium text-indigo-700">
+                    Safety Instructions:
+                  </span>
+                  <p className="text-sm mt-1 text-gray-600">
+                    {analysis.safetyInstructions}
+                  </p>
+                </div>
+              )}
+              {analysis.recommendedServices &&
+                analysis.recommendedServices.length > 0 && (
+                  <div>
+                    <span className="text-sm font-medium text-gray-600">
+                      Recommended Services:
+                    </span>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {analysis.recommendedServices.map((service, index) => (
+                        <span
+                          key={index}
+                          className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium"
+                        >
+                          {service}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+            </div>
           </div>
         </Card>
       )}
 
-      {/* SOS History */}
-      <h2 className="text-xl font-bold text-gray-900 mb-4">My SOS Requests</h2>
-      <div className="space-y-4">
+      {activeSos?.providerId && (
+        <Card className="mb-6">
+          <div className="p-5">
+            <h3 className="font-bold text-gray-900 mb-3">
+              Assigned Provider
+            </h3>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <span className="text-lg font-bold text-blue-600">
+                  {activeSos.providerId.firstName?.[0]}
+                  {activeSos.providerId.lastName?.[0]}
+                </span>
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900">
+                  {activeSos.providerId.firstName}{" "}
+                  {activeSos.providerId.lastName}
+                </p>
+                <p className="text-sm text-gray-500">
+                  {activeSos.providerId.phone}
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <h2 className="text-xl font-bold text-gray-900 mb-4">
+        My SOS Requests
+      </h2>
+      <div className="space-y-3">
         {mySosList.length === 0 ? (
           <Card>
-            <p className="text-gray-500 text-center py-4">No SOS requests found.</p>
+            <p className="text-gray-500 text-center py-8">
+              No SOS requests found.
+            </p>
           </Card>
         ) : (
           mySosList.map((sos) => (
-            <Card key={sos._id} className="flex justify-between items-center-safe">
+            <Card
+              key={sos._id}
+              className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
+            >
               <div>
-                <p className="font-semibold text-gray-800">{sos.emergencyType}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-gray-800">
+                    {sos.emergencyType}
+                  </p>
+                  {sos.aiAnalysis?.image_url && (
+                    <span title="Has photo evidence">📸</span>
+                  )}
+                </div>
                 <p className="text-sm text-gray-500">
-                  Status: <span className="font-medium text-gray-900">{sos.status}</span>
+                  Status:{" "}
+                  <span className="font-medium text-gray-900">
+                    {sos.status}
+                  </span>
                 </p>
-                <p className="text-xs text-gray-400">{new Date(sos.createdAt).toLocaleString()}</p>
+                <p className="text-xs text-gray-400">
+                  {new Date(sos.createdAt).toLocaleString()}
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                {/*  Show image indicator if SOS has image */}
-                {sos.aiAnalysis?.image_url && (
-                  <span title="Has photo evidence">📸</span>
-                )}
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  sos.status === "PENDING" ? "bg-yellow-100 text-yellow-800"
-                  : sos.status === "ACCEPTED" ? "bg-blue-100 text-blue-800"
-                  : sos.status === "ON_THE_WAY" ? "bg-purple-100 text-purple-800"
-                  : sos.status === "ARRIVED" ? "bg-indigo-100 text-indigo-800"
-                  : "bg-green-100 text-green-800"
-                }`}>
-                  {sos.status}
-                </span>
-              </div>
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-semibold shrink-0 ${
+                  sos.status === "PENDING"
+                    ? "bg-yellow-100 text-yellow-800"
+                    : sos.status === "ACCEPTED"
+                      ? "bg-blue-100 text-blue-800"
+                      : sos.status === "ON_THE_WAY"
+                        ? "bg-purple-100 text-purple-800"
+                        : sos.status === "ARRIVED"
+                          ? "bg-indigo-100 text-indigo-800"
+                          : "bg-emerald-100 text-emerald-800"
+                }`}
+              >
+                {sos.status.replace("_", " ")}
+              </span>
             </Card>
           ))
-        )}
-        {activeSos?.providerId && (
-          <Card className="mb-4">
-            <h3 className="font-bold mb-3">Assigned Provider</h3>
-            <p>Name: {activeSos.providerId.firstName} {activeSos.providerId.lastName}</p>
-            <p>Phone: {activeSos.providerId.phone}</p>
-          </Card>
         )}
       </div>
     </div>

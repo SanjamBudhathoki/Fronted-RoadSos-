@@ -1,73 +1,97 @@
 import { useEffect, useRef } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
+
 import "leaflet-routing-machine";
 import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
 
-const RoutingMachine = ({ providerLocation, userLocation }) => {
+const RoutingMachine = ({
+  providerLocation,
+  userLocation,
+}) => {
   const map = useMap();
-  const controlRef = useRef(null);
-  const initializedRef = useRef(false);
+  const routingRef = useRef(null);
 
-  // Initialize routing control once
   useEffect(() => {
-    if (!map || initializedRef.current) return;
-    if (!providerLocation || !userLocation) return;
+    if (
+      !providerLocation ||
+      !userLocation
+    ) {
+      return;
+    }
 
-    const [plat, plng] = providerLocation;
-    const [ulat, ulng] = userLocation;
+    if (routingRef.current) {
+      map.removeControl(routingRef.current);
+    }
 
-    if (!Number.isFinite(plat) || !Number.isFinite(ulat)) return;
-
-    controlRef.current = L.Routing.control({
+    routingRef.current = L.Routing.control({
       waypoints: [
-        L.latLng(plat, plng),
-        L.latLng(ulat, ulng),
+        L.latLng(
+          providerLocation[0],
+          providerLocation[1]
+        ),
+        L.latLng(
+          userLocation[0],
+          userLocation[1]
+        ),
       ],
+
       routeWhileDragging: false,
       addWaypoints: false,
       draggableWaypoints: false,
       fitSelectedRoutes: true,
-      show: true,
+      show: false,
+
       lineOptions: {
-        styles: [{ color: "#dc2626", weight: 5, opacity: 0.8 }],
+        styles: [
+          {
+            color: "#dc2626",
+            opacity: 0.8,
+            weight: 6,
+          },
+        ],
       },
-      createMarker: () => null, // Don't create default markers
+
+      createMarker: () => null,
     }).addTo(map);
 
-    initializedRef.current = true;
+    routingRef.current.on(
+      "routesfound",
+      (e) => {
+        const route = e.routes[0];
+
+        const distance =
+          route.summary.totalDistance / 1000;
+
+        const duration =
+          route.summary.totalTime / 60;
+
+        console.log(
+          "Distance:",
+          distance.toFixed(2),
+          "km"
+        );
+
+        console.log(
+          "ETA:",
+          Math.round(duration),
+          "min"
+        );
+      }
+    );
 
     return () => {
-      if (controlRef.current && map) {
-        try {
-          map.removeControl(controlRef.current);
-        } catch (e) {
-          console.warn("Error removing routing control:", e);
-        }
-        controlRef.current = null;
-        initializedRef.current = false;
+      if (routingRef.current) {
+        map.removeControl(
+          routingRef.current
+        );
       }
     };
-  }, [map, providerLocation, userLocation]);
-
-  // Update waypoints when locations change
-  useEffect(() => {
-    if (!controlRef.current || !providerLocation || !userLocation) return;
-
-    const [plat, plng] = providerLocation;
-    const [ulat, ulng] = userLocation;
-
-    if (!Number.isFinite(plat) || !Number.isFinite(ulat)) return;
-
-    try {
-      controlRef.current.setWaypoints([
-        L.latLng(plat, plng),
-        L.latLng(ulat, ulng),
-      ]);
-    } catch (e) {
-      console.warn("Error updating waypoints:", e);
-    }
-  }, [providerLocation, userLocation]);
+  }, [
+    map,
+    providerLocation,
+    userLocation,
+  ]);
 
   return null;
 };

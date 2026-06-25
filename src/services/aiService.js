@@ -10,7 +10,8 @@ export const aiService = {
     return response.data;
   },
 
-  voiceSos: async (data) => {
+voiceSos: async (data) => {
+  console.log("send data backend",data)
     const response = await $port.post(
       "/ai/voice-sos",
       data

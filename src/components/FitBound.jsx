@@ -2,35 +2,43 @@ import { useEffect } from "react";
 import { useMap } from "react-leaflet";
 import L from "leaflet";
 
-const FitBound = ({ userLocation, providerLocation }) => {
+const isValidLatLng = (pos) => {
+  if (!Array.isArray(pos) || pos.length !== 2) {
+    return false;
+  }
+
+  const [lat, lng] = pos;
+
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng)
+  );
+};
+
+const FitBounds = ({
+  userLocation,
+  providerLocation,
+}) => {
   const map = useMap();
 
   useEffect(() => {
-    if (!map) return;
-
     const points = [];
 
-    if (
-      Array.isArray(userLocation) &&
-      userLocation.length === 2 &&
-      Number.isFinite(userLocation[0]) &&
-      Number.isFinite(userLocation[1])
-    ) {
+    if (isValidLatLng(userLocation)) {
       points.push(userLocation);
     }
 
-    if (
-      Array.isArray(providerLocation) &&
-      providerLocation.length === 2 &&
-      Number.isFinite(providerLocation[0]) &&
-      Number.isFinite(providerLocation[1])
-    ) {
+    if (isValidLatLng(providerLocation)) {
       points.push(providerLocation);
     }
 
     if (points.length === 2) {
       const bounds = L.latLngBounds(points);
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+
+      map.fitBounds(bounds, {
+        padding: [50, 50],
+        maxZoom: 16,
+      });
     } else if (points.length === 1) {
       map.setView(points[0], 14);
     }
@@ -39,4 +47,4 @@ const FitBound = ({ userLocation, providerLocation }) => {
   return null;
 };
 
-export default FitBound;
+export default FitBounds;
