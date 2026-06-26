@@ -14,6 +14,7 @@ const LoginForm = () => {
   const { login } = useAuth();
   const [error, setError] = useState("");
 
+
   const loginMutation = useMutation({
     mutationKey: ["login"],
     mutationFn: async (values) => {
@@ -30,8 +31,16 @@ const LoginForm = () => {
       }
     },
     onError: (err) => {
-      setError(err?.response?.data?.message || "Login failed");
-    },
+  console.log("========== LOGIN ERROR ==========");
+  console.log(err);
+  console.log("Message:", err.message);
+  console.log("Response:", err.response);
+  console.log("Data:", err.response?.data);
+  console.log("Status:", err.response?.status);
+  console.log("Config:", err.config);
+
+  setError(err?.response?.data?.message || err.message || "Login failed");
+},
   });
 
   return (
