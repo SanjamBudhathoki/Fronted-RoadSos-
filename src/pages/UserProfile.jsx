@@ -242,8 +242,8 @@ const UserProfile = () => {
 
                   {/* Quick Info Pills */}
                   <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2 mt-5">
-                    <span className="inline-flex items-center gap-1.5] bg-linear-to-r from-red-50 to-pink-50 border border-red-100 px-3 py-1.5 rounded-full text-sm font-semibold text-red-700">
-                      <Shield className="h-3.5 w-3.5" />
+                    <span className="inline-flex items-center gap-1.5 bg-linear-to-r from-red-50 to-pink-50 border border-red-100 px-3 py-1.5 rounded-full text-sm font-semibold text-red-700">
+                      <Shield className="h-3.5 w-6 gap-1.5" />
                       {profile.role?.toUpperCase()}
                     </span>
                     
@@ -563,7 +563,8 @@ const UserProfile = () => {
                     variant="danger"
                     size="lg"
                     onClick={handleDelete}
-                    className="rounded-2xl font-bold shadow-lg shadow-red-200 hover:shadow-xl hover:shadow-red-300 shrink-0"
+                    className="rounded-2xl font-bold shadow-lg shadow-red-200 
+                    hover:shadow-xl hover:shadow-red-300 shrink-0"
                     icon={<Trash2 className="w-5 h-5" />}
                   >
                     Delete My Account

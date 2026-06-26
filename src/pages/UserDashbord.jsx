@@ -37,6 +37,8 @@ const UserDashboard = () => {
 
   const recognitionRef = useRef(null);
   const successTimeoutRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
 
   useEffect(() => {
     if (success) {
@@ -218,6 +220,9 @@ const UserDashboard = () => {
 
           await fetchMySos();
         } catch (err) {
+          console.error("Trigger SOS Error:", err);
+          console.error(err.response);
+          console.error(err.stack);
           setError("Failed to trigger SOS. Please try again.");
         } finally {
           setActionLoading(false);
@@ -254,6 +259,24 @@ const UserDashboard = () => {
 
     setSelectedImage(file);
     setImagePreview(URL.createObjectURL(file));
+  };
+
+  // New camera handler
+  const handleCameraCapture = () => {
+    // Reset the input value so the same file can be selected again if needed
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
+      cameraInputRef.current.click();
+    }
+  };
+
+  // New gallery handler  
+  const handleGalleryOpen = () => {
+    // Reset the input value so the same file can be selected again if needed
+    if (galleryInputRef.current) {
+      galleryInputRef.current.value = "";
+      galleryInputRef.current.click();
+    }
   };
 
   const handleImageAnalysis = async () => {
@@ -577,29 +600,40 @@ const UserDashboard = () => {
                       Take a photo or upload from gallery
                     </p>
                     <div className="flex flex-wrap justify-center gap-3">
-                      <label className="cursor-pointer">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageSelect}
-                          className="hidden"
-                        />
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition text-sm font-medium">
-                          <Upload size={16} /> Gallery
-                        </div>
-                      </label>
-                      <label className="cursor-pointer">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          onChange={handleImageSelect}
-                          className="hidden"
-                        />
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-600 text-emerald-600 hover:bg-emerald-50 transition text-sm font-medium">
-                          <Camera size={16} /> Camera
-                        </div>
-                      </label>
+                      {/* Hidden file inputs */}
+                      <input
+                        ref={galleryInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                        aria-label="Select image from gallery"
+                      />
+                      <input
+                        ref={cameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                        aria-label="Take a photo with camera"
+                      />
+                      
+                      {/* Gallery button */}
+                      <button
+                        onClick={handleGalleryOpen}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition text-sm font-medium"
+                      >
+                        <Upload size={16} /> Gallery
+                      </button>
+                      
+                      {/* Camera button */}
+                      <button
+                        onClick={handleCameraCapture}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-600 text-emerald-600 hover:bg-emerald-50 transition text-sm font-medium"
+                      >
+                        <Camera size={16} /> Camera
+                      </button>
                     </div>
                   </div>
                 </div>

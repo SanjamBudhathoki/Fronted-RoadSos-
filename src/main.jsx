@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import "./index.css";
@@ -22,21 +22,20 @@ const router = createBrowserRouter([
 
 const queryClient = new QueryClient();
 
+
+
 createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <NotificationProvider>
-        <RouterProvider router={router} />
-        </NotificationProvider>
-      </AuthProvider>
-    </QueryClientProvider>
-  </React.StrictMode>
+    <React.StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <NotificationProvider>
+            <Suspense fallback={<div>Loading...</div>}>
+              <RouterProvider router={router} />
+            </Suspense>
+          </NotificationProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </React.StrictMode>
 );
 
 
-
-/* how to make a react project a working app like i was 
- used to React and make a full application ,'
-  now i need a mobile app, how to do it step
-  wise step process this is my web app code i */

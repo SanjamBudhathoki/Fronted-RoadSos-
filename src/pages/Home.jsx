@@ -24,11 +24,11 @@ const Home = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-gray-50 to-white">
+    <div className="min-h-screen bg-linear-to-b from-white via-gray-50 to-white">
       
       {/* HERO SECTION */}
       <section className="relative overflow-hidden pt-20 pb-16 lg:pt-32 lg:pb-24">
-        <div className="absolute inset-0 bg-gradient-to-b from-blue-50/30 to-transparent pointer-events-none"></div>
+        <div className="absolute inset-0 bg-linear-to-b from-blue-50/30 to-transparent pointer-events-none"></div>
         
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl mx-auto text-center">
@@ -36,7 +36,7 @@ const Home = () => {
             {/* Headline */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 leading-[1.1]">
               AI-Powered Emergency
-              <span className="block mt-3 bg-gradient-to-r from-red-600 to-red-500 bg-clip-text text-transparent">
+              <span className="block mt-3 bg-linear-to-r from-red-600 to-red-500 bg-clip-text text-transparent">
                 Response System
               </span>
             </h1>
@@ -116,7 +116,7 @@ const Home = () => {
               </div>
               <p className="text-sm text-gray-500 font-medium">Response Time</p>
               <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-red-500 to-emerald-500 rounded-full" style={{width: '94%'}}></div>
+                <div className="h-full bg-linear-to-r from-red-500 to-emerald-500 rounded-full" style={{width: '94%'}}></div>
               </div>
             </Card>
 
@@ -200,7 +200,7 @@ const Home = () => {
             }
           ].map((item, idx) => (
             <Card key={idx} className="group bg-white rounded-2xl border border-gray-200 p-8 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-              <div className="w-14 h-14 bg-gradient-to-br from-red-50 to-red-100 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+              <div className="w-14 h-14 bg-linear-to-br from-red-50 to-red-100 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                 <span className="text-2xl font-bold text-red-600">{item.step}</span>
               </div>
               <span className="text-xs font-bold text-red-600 uppercase tracking-wider">Step {item.step}</span>
@@ -281,7 +281,7 @@ const Home = () => {
           ].map((feature, index) => (
             <Card key={index} className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1">
               <div className="flex items-start gap-5">
-                <div className="w-12 h-12 bg-gradient-to-br from-red-50 to-red-100 rounded-xl flex items-center justify-center shrink-0 text-2xl">
+                <div className="w-12 h-12 bg-linear-to-br from-red-50 to-red-100 rounded-xl flex items-center justify-center shrink-0 text-2xl">
                   {feature.icon}
                 </div>
                 <div>
@@ -296,9 +296,9 @@ const Home = () => {
 
       {/* FINAL CTA SECTION */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
-        <Card className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 sm:p-12 lg:p-16 relative overflow-hidden border border-gray-700">
+        <Card className="bg-linear-to-br from-gray-900 to-gray-800 rounded-3xl p-8 sm:p-12 lg:p-16 relative overflow-hidden border border-gray-700">
           <div className="absolute inset-0 opacity-[0.02]">
-            <div className="absolute inset-0" style={{backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '24px 24px'}}></div>
+            <div className="absolute inset-0" style={{backgroundImage: 'radial-linear(circle, #ffffff 1px, transparent 1px)', backgroundSize: '24px 24px'}}></div>
           </div>
           
           <div className="relative text-center max-w-2xl mx-auto">

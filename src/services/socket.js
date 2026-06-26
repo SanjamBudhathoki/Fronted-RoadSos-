@@ -1,22 +1,34 @@
 import { io } from "socket.io-client";
 
-
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5642';
-
-console.log('🔌 Connecting to socket server:', SOCKET_URL);
+const SOCKET_URL = import.meta.env.VITE_API_URL;
 
 const socket = io(SOCKET_URL, {
-  autoConnect: true,
+  autoConnect: true, // Don't connect automatically
   reconnection: true,
-  reconnectionAttempts: Infinity,
-  reconnectionDelay: 1000,
-  reconnectionDelayMax: 5000,
-  timeout: 20000,
-  transports: ['websocket', 'polling'], // Try WebSocket first, fallback to polling
+  reconnectionAttempts: 5, // Limit attempts, NOT Infinity
+  reconnectionDelay: 2000,
+  reconnectionDelayMax: 10000,
+  timeout: 10000,
+  transports: ['websocket'],
+  randomizationFactor: 0.5, // Add jitter to prevent thundering herd
 });
 
+// Only connect when explicitly called
+export const connectSocket = () => {
+  if (!socket.connected) {
+    console.log('🔌 Connecting to socket server:', SOCKET_URL);
+    socket.connect();
+  }
+};
+
+export const disconnectSocket = () => {
+  if (socket.connected) {
+    socket.disconnect();
+  }
+};
+
 socket.on('connect', () => {
-  console.log(' Socket connected:', socket.id);
+  console.log('✅ Socket connected:', socket.id);
 });
 
 socket.on('disconnect', (reason) => {
@@ -24,23 +36,12 @@ socket.on('disconnect', (reason) => {
 });
 
 socket.on('connect_error', (error) => {
-  console.error(' Socket connection error:', error.message);
-});
-
-socket.on('reconnect', (attemptNumber) => {
-  console.log('Socket reconnected after', attemptNumber, 'attempts');
-});
-
-socket.on('reconnect_attempt', (attemptNumber) => {
-  console.log('Reconnection attempt:', attemptNumber);
-});
-
-socket.on('reconnect_error', (error) => {
-  console.error('Reconnection error:', error.message);
-});
-
-socket.on('reconnect_failed', () => {
-  console.error('Failed to reconnect after all attempts');
+  console.error('❌ Socket connection error:', error.message);
+  // Stop reconnecting after max attempts
+  if (socket.io.reconnectionAttempts >= 5) {
+    console.log('Max reconnection attempts reached, stopping...');
+    socket.io.opts.reconnection = false;
+  }
 });
 
 export default socket;

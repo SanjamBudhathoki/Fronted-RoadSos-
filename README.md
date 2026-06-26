@@ -236,11 +236,6 @@ User Opens App
             └── Mark Arrived / Complete
 ```
 
----
-
-## 👥 Team
-
-Built with ❤️ for Hackathon 2026
 
 ---
 

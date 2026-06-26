@@ -255,42 +255,85 @@ const ProviderDashboard = () => {
 
 const handleAcceptSos = async (id) => {
   try {
+    console.log("🔄 Accepting SOS:", id);
     const response = await sosService.acceptSos(id);
-    const mission = response?.data;
-
+    
+    // Log the full response to debug
+    console.log("✅ Accept SOS response:", response);
+    
+    // Handle different response structures
+    const missionData = response?.data?.data || response?.data || response;
+    
+    if (!missionData || !missionData._id) {
+      throw new Error("Invalid response from server - no mission data");
+    }
+    
     // Get original SOS details before removing it
     const sos = nearbySos.find((item) => item._id === id);
-
+    
+    if (!sos) {
+      throw new Error("SOS not found in nearby list");
+    }
+    
+    console.log(" Original SOS data:", sos);
+    console.log(" Mission data from server:", missionData);
+    
     // Merge missing fields from SOS into mission
     const fullMission = {
-      ...mission,
-      location: sos?.location ?? mission.location,
-      driverId: sos?.driverId ?? mission.driverId,
-      emergencyType: sos?.emergencyType ?? mission.emergencyType,
+      ...missionData,
+      location: missionData.location || sos.location,
+      driverId: missionData.driverId || sos.driverId,
+      emergencyType: missionData.emergencyType || sos.emergencyType,
+      aiAnalysis: missionData.aiAnalysis || sos.aiAnalysis, // Preserve AI analysis
     };
-
+    
+    console.log(" Full mission data:", fullMission);
+    
     setActiveMission(fullMission);
-
+    
     setMissionStartTime(
       fullMission.acceptedAt
         ? new Date(fullMission.acceptedAt).getTime()
         : Date.now()
     );
-
+    
+    // Remove from nearby list
     setNearbySos((prev) =>
       prev.filter((item) => item._id !== id)
     );
-
+    
+    // Send initial location update
     if (currentLocation) {
-      socket.emit("provider:location-update", {
+      const locationPayload = {
         sosId: fullMission._id,
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
-      });
+      };
+      console.log("📍 Sending initial location:", locationPayload);
+      socket.emit("provider:location-update", locationPayload);
     }
+    
+    // Clear any existing errors
+    setError('');
+    
   } catch (err) {
-    console.error(err);
-    setError("Failed to accept SOS.");
+    console.error("❌ Failed to accept SOS:", {
+      error: err,
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status
+    });
+    
+    // Provide more specific error messages
+    if (err.response?.status === 400) {
+      setError("This SOS has already been accepted by another provider.");
+    } else if (err.response?.status === 404) {
+      setError("SOS request no longer available.");
+    } else if (err.message === "Invalid response from server - no mission data") {
+      setError("Server returned unexpected data. Please try again.");
+    } else {
+      setError("Failed to accept SOS. Please try again.");
+    }
   }
 };
 
@@ -374,8 +417,6 @@ const handleAcceptSos = async (id) => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Header - Refined */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Provider Dashboard</h1>
@@ -397,7 +438,6 @@ const handleAcceptSos = async (id) => {
           </Button>
         </div>
 
-        {/* Error Message - Enhanced */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 animate-in slide-in-from-top-2 duration-300">
             <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
@@ -410,7 +450,7 @@ const handleAcceptSos = async (id) => {
           </div>
         )}
 
-        {/* Debug Info - Styled but collapsible */}
+
         {activeMission && (
           <details className="mb-6 group">
             <summary className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-medium text-amber-800 cursor-pointer hover:bg-amber-100 transition-colors flex items-center gap-2">
@@ -427,7 +467,7 @@ const handleAcceptSos = async (id) => {
           </details>
         )}
 
-        {/* Stats Grid - Enhanced Cards */}
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 p-6">
             <div className="flex items-center gap-3">
@@ -468,10 +508,8 @@ const handleAcceptSos = async (id) => {
           </Card>
         </div>
 
-        {/* Main Content Grid */}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* SOS List - Left Side */}
           <div className="lg:col-span-2">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
               <h2 className="text-xl font-bold text-gray-900">Nearby Emergencies</h2>

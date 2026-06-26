@@ -51,7 +51,7 @@ const RegisterForm = () => {
         <div className="p-6 sm:p-8 lg:p-10">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-red-50 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <div className="w-16 h-16 bg-linear-to-br from-red-50 to-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <UserPlus className="w-8 h-8 text-red-600" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
@@ -143,7 +143,7 @@ const RegisterForm = () => {
                 .max(55, "Maximum 55 characters")
                 .required("Location is required"),
               role: Yup.string()
-                .oneOf(["driver", "provider"])
+                .oneOf(["user", "provider"])
                 .required("Role is required"),
             })}
             onSubmit={registerUser}
@@ -293,12 +293,12 @@ const RegisterForm = () => {
                     I want to register as a:
                   </label>
                   <div className="grid sm:grid-cols-2 gap-3">
-                    {/* Driver */}
+                    {/* user */}
                     <label
                       className={`
                         relative flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200
                         ${
-                          formik.values.role === "driver"
+                          formik.values.role === "user"
                             ? "border-red-500 bg-red-50"
                             : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                         }
@@ -307,21 +307,21 @@ const RegisterForm = () => {
                       <input
                         type="radio"
                         name="role"
-                        value="driver"
-                        checked={formik.values.role === "driver"}
+                        value="user"
+                        checked={formik.values.role === "user"}
                         onChange={formik.handleChange}
                         className="sr-only"
                       />
                       <div
                         className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                          formik.values.role === "driver"
+                          formik.values.role === "user"
                             ? "bg-red-100"
                             : "bg-gray-100"
                         }`}
                       >
                         <Car
                           className={`w-5 h-5 ${
-                            formik.values.role === "driver"
+                            formik.values.role === "user"
                               ? "text-red-600"
                               : "text-gray-500"
                           }`}
@@ -329,13 +329,13 @@ const RegisterForm = () => {
                       </div>
                       <div>
                         <p className="font-semibold text-gray-900 text-sm">
-                          Driver
+                          User
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5">
                           Need emergency assistance
                         </p>
                       </div>
-                      {formik.values.role === "driver" && (
+                      {formik.values.role === "user" && (
                         <div className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
                           <CheckCircle2 className="w-3.5 h-3.5 text-white" />
                         </div>
