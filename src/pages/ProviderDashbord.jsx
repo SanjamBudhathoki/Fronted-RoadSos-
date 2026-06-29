@@ -76,14 +76,32 @@ const ProviderDashboard = () => {
       setActiveMission((current) => (current?._id === sosId ? null : current));
     };
 
+    const onAutoDispatched = ({ sos, message }) => {
+  // Treat it exactly like a manually accepted mission
+  const fullMission = {
+    ...sos,
+    status: "ACCEPTED",
+  };
+  setActiveMission(fullMission);
+  setMissionStartTime(sos.acceptedAt
+    ? new Date(sos.acceptedAt).getTime()
+    : Date.now()
+  );
+  // Optional: show a toast/alert so provider knows
+  alert(`🚨 Auto-Dispatched: ${message}`);
+    };
+
+
     socket.on('sos:new', handleNewSOS);
     socket.on('sos:accepted', onAccepted);
     socket.on('sos:completed', onCompleted);
+    socket.on("sos:auto-dispatched", onAutoDispatched);
 
     return () => {
       socket.off('sos:new', handleNewSOS);
       socket.off('sos:accepted', onAccepted);
       socket.off('sos:completed', onCompleted);
+      socket.off("sos:auto-dispatched", onAutoDispatched);
     };
   }, [fetchNearbySos, handleNewSOS]);
 

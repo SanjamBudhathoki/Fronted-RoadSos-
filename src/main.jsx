@@ -21,6 +21,7 @@ const router = createBrowserRouter([
 ]);
 
 const queryClient = new QueryClient();
+window.addEventListener("online", syncOfflineSOS);
 
 
 createRoot(document.getElementById("root")).render(

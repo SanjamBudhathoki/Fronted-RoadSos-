@@ -16,7 +16,7 @@ export const NotificationProvider = ({
     useState([]);
 
   useEffect(() => {
-    socket.on("sos-updated", (data) => {
+    socket.on("sos:statusUpdated", (data) => {
       let message = "";
 
       switch (data.status) {
@@ -57,7 +57,7 @@ export const NotificationProvider = ({
     });
 
     return () => {
-      socket.off("sos-updated");
+      socket.off("sos:statusUpdated");
     };
   }, []);
 

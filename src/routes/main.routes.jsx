@@ -4,6 +4,7 @@ import ProviderDashboard from '../pages/ProviderDashbord';
 import UserProfile from '../pages/UserProfile';
 import LiveTrackingMaps from '../components/LiveTrackingMaps';
 import UserDashboard from '../pages/UserDashbord';
+import ProjectRoute from '../components/ProjectRoute';
 
 const mainRoutes =  [
   {
@@ -16,10 +17,11 @@ const mainRoutes =  [
   },
   {
     path: "/user/dashbord",
-    element: <UserDashboard />,
+    element: <ProjectRoute allowedRole="user"><UserDashboard /></ProjectRoute>,
+    
   },{
     path: "/provider/dashbord",
-    element: <ProviderDashboard />,
+    element:<ProjectRoute allowedRole="provider"><ProviderDashboard /></ProjectRoute>,
   },
   {
     path: "/user/profile",

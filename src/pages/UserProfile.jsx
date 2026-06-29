@@ -63,9 +63,9 @@ const UserProfile = () => {
 
   const fetchProfile = async () => {
     try {
-      const data = await authService.getProfile();
-      setProfile(data);
-      setOriginalProfile(data);
+const data = await authService.getProfile();
+setProfile(data?.data || data);
+setOriginalProfile(data?.data || data);
     } catch (err) {
       console.log("Profile error:", err);
     } finally {

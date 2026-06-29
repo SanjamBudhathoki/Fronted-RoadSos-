@@ -106,12 +106,15 @@ const UserDashboard = () => {
   }, []);
 
   useEffect(() => {
-    const handleStatusUpdate = ({ sosId, status }) => {
-      setMySosList((prev) =>
-        prev.map((item) => (item._id === sosId ? { ...item, status } : item))
-      );
-    };
-
+  const handleStatusUpdate = ({ sosId, status, autoDispatched }) => {
+  setMySosList((prev) =>
+    prev.map((item) => (item._id === sosId ? { ...item, status } : item))
+  );
+  // Show user it was auto-dispatched
+  if (autoDispatched) {
+    setSuccess("Help is on the way! A provider was automatically dispatched to you.");
+  }
+};
     const handleArrival = () => {
       setSuccess("Provider has arrived at your location!");
     };
