@@ -119,14 +119,22 @@ const UserDashboard = () => {
       setSuccess("Provider has arrived at your location!");
     };
 
+    const handleAnalysisReady = ({ sosId, ...result }) => {
+      if (activeSosId && String(sosId) === String(activeSosId)) {
+        setAnalysis((prev) => ({ ...prev, ...result }));
+      }
+    };
+
     socket.on("sos:statusUpdated", handleStatusUpdate);
     socket.on("provider-arrived", handleArrival);
+    socket.on("sos:analysis-ready", handleAnalysisReady);
 
     return () => {
       socket.off("sos:statusUpdated", handleStatusUpdate);
       socket.off("provider-arrived", handleArrival);
+      socket.off("sos:analysis-ready", handleAnalysisReady);
     };
-  }, []);
+  }, [activeSosId]);
 
   useEffect(() => {
     setProviderLocation(null);
@@ -734,14 +742,16 @@ const UserDashboard = () => {
               ))}
             </div>
           </div>
-              <NotifyEmergencyContacts
-      latitude={activeSos.location.coordinates[1]}
-      longitude={activeSos.location.coordinates[0]}
-      emergencyType={activeSos.emergencyType}
-    />
         </Card>
-        
       )}
+      
+      {activeSos?.location?.coordinates?.length >= 2 && (
+    <NotifyEmergencyContacts
+        latitude={activeSos.location.coordinates[1]}
+        longitude={activeSos.location.coordinates[0]}
+        emergencyType={activeSos.emergencyType}
+    />
+)}
 
      {/* //! NearBy emergency component  */}
           <NearbyServices/>
