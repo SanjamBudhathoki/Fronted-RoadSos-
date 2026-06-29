@@ -32,6 +32,7 @@ import Button from "../components/Button";
 import { useNavigate } from "react-router-dom";
 import { authService } from "../services/authService";
 import Card from "../components/Card";
+import EmergencyContacts from "../components/EmergencyContacts";
 
 const UserProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -528,6 +529,8 @@ const UserProfile = () => {
                 </div>
               </div>
             </Card>
+            {/* Emergency Contact Component */}
+                  <EmergencyContacts/>
 
             {/* Danger Zone Card */}
             <Card className="bg-white/80 backdrop-blur-xl border border-red-200 shadow-lg rounded-2xl overflow-hidden p-0 hover:shadow-xl transition-shadow duration-300">

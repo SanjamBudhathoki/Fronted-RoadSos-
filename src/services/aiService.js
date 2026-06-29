@@ -37,5 +37,10 @@ voiceSos: async (data) => {
     );
 
     return response.data;
-  }
+  },
+
+  chat: async (message, history = []) => {
+  const response = await $port.post("/ai/chat", { message, history });
+  return response.data;
+}
 };

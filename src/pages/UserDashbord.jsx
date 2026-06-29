@@ -19,6 +19,8 @@ import {
 import socket from "../services/socket";
 import { calculateDistance } from "../services/distanceCalculator";
 import LiveTrackingMaps from "../components/LiveTrackingMaps";
+import NearbyServices from "../components/NearByServices";
+import NotifyEmergencyContacts from "../components/NotifyEmergencyContact";
 
 const UserDashboard = () => {
   const [mySosList, setMySosList] = useState([]);
@@ -711,6 +713,8 @@ const UserDashboard = () => {
                   Cancel SOS
                 </Button>
               )}
+
+
             </div>
             <div className="flex flex-wrap gap-2 mt-5">
               {steps.map((step) => (
@@ -727,8 +731,17 @@ const UserDashboard = () => {
               ))}
             </div>
           </div>
+              <NotifyEmergencyContacts
+      latitude={activeSos.location.coordinates[1]}
+      longitude={activeSos.location.coordinates[0]}
+      emergencyType={activeSos.emergencyType}
+    />
         </Card>
+        
       )}
+
+     {/* //! NearBy emergency component  */}
+          <NearbyServices/>
 
       {activeSos && (
         <Card className="mb-6 overflow-hidden">
@@ -825,7 +838,6 @@ const UserDashboard = () => {
           </div>
         </Card>
       </div>
-
       {analysis && (
         <Card className="mb-6 border-indigo-200 bg-indigo-50/50">
           <div className="p-5">

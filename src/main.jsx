@@ -22,7 +22,6 @@ const router = createBrowserRouter([
 
 const queryClient = new QueryClient();
 
-console.log(import.meta.env.VITE_API_URL);
 
 createRoot(document.getElementById("root")).render(
     <React.StrictMode>
