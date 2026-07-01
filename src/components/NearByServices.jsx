@@ -107,7 +107,7 @@ const NearbyServices = ({ latitude: propLat, longitude: propLon }) => {
             onClick={() => setActiveTab(type)}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm whitespace-nowrap transition-all ${
               activeTab === type
-                ? "bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg"
+                ? "bg-linear-to-r from-red-600 to-red-700 text-white shadow-lg"
                 : "bg-white/5 text-gray-300 hover:bg-white/10"
             }`}
           >
@@ -151,7 +151,7 @@ const NearbyServices = ({ latitude: propLat, longitude: propLon }) => {
       )}
 
       {!locationError && !loading && !error && activeResults.length > 0 && (
-        <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+        <div className="space-y-2.5 max-h-150 overflow-y-auto pr-1">
           {activeResults.map((place) => (
             <Card
               key={place.id}
